@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coastal City Digital Twin | Phase 3 — Perfect City</title>
+<meta name="description" content="Phase 3 Coastal City Digital Twin with grid-based city layout, Hunyuan3D-2 2D-to-3D conversion, and real-time disaster prediction.">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;overflow:hidden;background:#060610;color:#F7F4ED}
+#canvas-container{width:100vw;height:100vh;position:fixed;top:0;left:0}
+canvas{display:block}
+#loading-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:linear-gradient(135deg,#060610 0%,#0a1628 50%,#060610 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;transition:opacity 1.5s ease}
+#loading-screen.fade-out{opacity:0;pointer-events:none}
+.loading-title{font-size:2.8rem;font-weight:300;color:#F7F4ED;letter-spacing:0.2em;margin-bottom:6px;text-shadow:0 0 40px rgba(200,169,107,0.4)}
+.loading-badge{font-size:0.65rem;color:#C8A96B;letter-spacing:0.4em;text-transform:uppercase;margin-bottom:8px;padding:3px 12px;border:1px solid rgba(200,169,107,0.3);border-radius:20px}
+.loading-subtitle{font-size:0.8rem;color:#8FA28A;letter-spacing:0.25em;text-transform:uppercase;margin-bottom:44px}
+.loading-bar-container{width:320px;height:2px;background:rgba(143,162,138,0.12);border-radius:2px;overflow:hidden}
+.loading-bar{width:0%;height:100%;background:linear-gradient(90deg,#8FA28A,#C8A96B);transition:width 0.25s ease}
+.loading-text{margin-top:18px;font-size:0.72rem;color:rgba(247,244,237,0.35);letter-spacing:0.12em}
+.phase-tag{position:absolute;bottom:40px;font-size:0.65rem;color:rgba(200,169,107,0.5);letter-spacing:0.2em}
+.ui-overlay{position:fixed;pointer-events:none;z-index:100;top:0;left:0;width:100%;height:100%}
+.ui-overlay>*{pointer-events:auto}
+.top-bar{position:absolute;top:20px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;padding:10px 28px;background:rgba(6,6,16,0.7);backdrop-filter:blur(24px);border:1px solid rgba(143,162,138,0.14);border-radius:18px;box-shadow:0 4px 30px rgba(0,0,0,0.3)}
+.top-bar .logo{font-size:0.85rem;font-weight:700;color:#F7F4ED;letter-spacing:0.12em}
+.top-bar .phase-label{font-size:0.62rem;padding:2px 8px;background:rgba(200,169,107,0.2);border:1px solid rgba(200,169,107,0.35);border-radius:8px;color:#C8A96B;letter-spacing:0.08em}
+.top-bar .divider{width:1px;height:16px;background:rgba(143,162,138,0.25)}
+.top-bar .time-display{font-size:0.8rem;color:#C7D3C0;font-variant-numeric:tabular-nums}
+.top-bar .fps-counter{font-size:0.68rem;color:#8FA28A;font-variant-numeric:tabular-nums;min-width:48px;text-align:right}
+.top-bar .alert-badge{padding:2px 8px;background:rgba(204,51,51,0.2);border:1px solid rgba(204,51,51,0.4);border-radius:6px;color:#ff6666;font-size:0.6rem;font-weight:600;letter-spacing:0.05em;display:none}
+.top-bar .alert-badge.active{display:block}
+.sidebar{position:absolute;top:80px;left:20px;width:300px;max-height:calc(100vh - 100px);overflow-y:auto;background:rgba(6,6,16,0.65);backdrop-filter:blur(28px);border:1px solid rgba(143,162,138,0.1);border-radius:22px;padding:20px}
+.sidebar::-webkit-scrollbar{width:3px}
+.sidebar::-webkit-scrollbar-thumb{background:rgba(143,162,138,0.25);border-radius:2px}
+.panel-section{margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid rgba(143,162,138,0.07)}
+.panel-section:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none}
+.panel-title{font-size:0.68rem;font-weight:600;color:#8FA28A;letter-spacing:0.18em;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.panel-title::before{content:'';width:6px;height:6px;border-radius:50%;background:#8FA28A;opacity:0.6}
+.panel-title.phase3::before{background:#C8A96B;box-shadow:0 0 6px rgba(200,169,107,0.4)}
+.panel-title.phase3{color:#C8A96B}
+.time-slider-container{position:relative;padding:8px 0}
+.time-slider,.flood-slider,.disaster-slider{-webkit-appearance:none;width:100%;height:3px;border-radius:2px;background:rgba(143,162,138,0.18);outline:none;cursor:pointer}
+.time-slider::-webkit-slider-thumb,.flood-slider::-webkit-slider-thumb,.disaster-slider::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:#C8A96B;cursor:pointer;border:2px solid #F7F4ED;box-shadow:0 0 12px rgba(200,169,107,0.4)}
+.flood-slider::-webkit-slider-thumb{background:#4488cc}
+.disaster-slider::-webkit-slider-thumb{background:#cc4444}
+.time-labels{display:flex;justify-content:space-between;margin-top:5px;font-size:0.6rem;color:rgba(247,244,237,0.35)}
+.current-time-label{text-align:center;font-size:0.78rem;color:#C8A96B;margin-top:6px;font-weight:500}
+.slider-labels{display:flex;justify-content:space-between;margin-top:5px;font-size:0.58rem;color:rgba(247,244,237,0.35)}
+.weather-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.weather-btn{padding:9px 5px;border:1px solid rgba(143,162,138,0.13);border-radius:10px;background:rgba(143,162,138,0.04);color:rgba(247,244,237,0.55);font-size:0.65rem;cursor:pointer;transition:all 0.25s ease;display:flex;flex-direction:column;align-items:center;gap:4px}
+.weather-btn:hover{background:rgba(143,162,138,0.1);border-color:rgba(143,162,138,0.28);color:#F7F4ED}
+.weather-btn.active{background:rgba(200,169,107,0.14);border-color:rgba(200,169,107,0.4);color:#C8A96B}
+.weather-btn svg{width:18px;height:18px}
+.camera-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.camera-btn{padding:9px 6px;border:1px solid rgba(143,162,138,0.13);border-radius:10px;background:rgba(143,162,138,0.04);color:rgba(247,244,237,0.55);font-size:0.68rem;cursor:pointer;transition:all 0.25s ease;text-align:center}
+.camera-btn:hover{background:rgba(143,162,138,0.1);border-color:rgba(143,162,138,0.28);color:#F7F4ED}
+.camera-btn.active{background:rgba(200,169,107,0.14);border-color:rgba(200,169,107,0.4);color:#C8A96B}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(143,162,138,0.07)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:0.72rem;color:rgba(247,244,237,0.65)}
+.toggle-switch{position:relative;width:38px;height:21px;background:rgba(143,162,138,0.14);border-radius:11px;cursor:pointer;transition:background 0.25s}
+.toggle-switch.active{background:#8FA28A}
+.toggle-switch.phase3.active{background:#C8A96B}
+.toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#F7F4ED;transition:transform 0.25s;box-shadow:0 1px 4px rgba(0,0,0,0.25)}
+.toggle-switch.active::after{transform:translateX(17px)}
+.action-btn{width:100%;padding:11px;border:1px solid rgba(143,162,138,0.18);border-radius:11px;background:rgba(143,162,138,0.06);color:#F7F4ED;font-size:0.72rem;font-weight:500;cursor:pointer;transition:all 0.25s;display:flex;align-items:center;justify-content:center;gap:8px;font-family:'Inter',sans-serif}
+.action-btn:hover{background:rgba(143,162,138,0.14);border-color:rgba(143,162,138,0.32)}
+.action-btn.primary{background:rgba(200,169,107,0.14);border-color:rgba(200,169,107,0.3);color:#C8A96B}
+.action-btn.primary:hover{background:rgba(200,169,107,0.24)}
+.action-btn.danger{background:rgba(204,51,51,0.12);border-color:rgba(204,51,51,0.28);color:#ff6666}
+.action-btn.danger:hover{background:rgba(204,51,51,0.22)}
+.action-btn.hunyuan{background:linear-gradient(135deg,rgba(200,169,107,0.2),rgba(143,162,138,0.1));border-color:#C8A96B;color:#C8A96B;font-weight:700;box-shadow:0 0 20px rgba(200,169,107,0.15)}
+.action-btn.hunyuan:hover{background:linear-gradient(135deg,rgba(200,169,107,0.3),rgba(143,162,138,0.2));box-shadow:0 0 30px rgba(200,169,107,0.25)}
+.prediction-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:7px}
+.prediction-card{padding:9px;border-radius:10px;background:rgba(143,162,138,0.04);border:1px solid rgba(143,162,138,0.09);text-align:center}
+.prediction-card .risk-label{font-size:0.58rem;color:rgba(247,244,237,0.45);text-transform:uppercase;letter-spacing:0.1em}
+.prediction-card .risk-value{font-size:1.15rem;font-weight:700;margin-top:3px}
+.prediction-card .risk-bar{height:2px;border-radius:1px;margin-top:5px;background:rgba(143,162,138,0.12);overflow:hidden}
+.prediction-card .risk-bar-fill{height:100%;border-radius:1px;transition:width 0.5s ease}
+.risk-low{color:#4caf50}.risk-med{color:#ff9800}.risk-high{color:#f44336}
+.fill-low{background:#4caf50}.fill-med{background:#ff9800}.fill-high{background:#f44336}
+.prediction-timeline{margin-top:10px;padding:9px;border-radius:10px;background:rgba(6,6,16,0.5);border:1px solid rgba(143,162,138,0.07)}
+.timeline-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:0.68rem}
+.timeline-row:last-child{margin-bottom:0}
+.timeline-dot{width:7px;height:7px;border-radius:50%;background:#8FA28A;flex-shrink:0}
+.timeline-dot.alert{background:#f44336;box-shadow:0 0 6px rgba(244,67,54,0.5)}
+.timeline-label{color:rgba(247,244,237,0.5);min-width:36px}
+.timeline-value{color:#F7F4ED;font-weight:500}
+.analytics-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px;margin-top:7px}
+.analytics-card{padding:9px;border-radius:10px;background:rgba(6,6,16,0.45);border:1px solid rgba(143,162,138,0.07)}
+.analytics-card .metric-label{font-size:0.58rem;color:rgba(247,244,237,0.45);text-transform:uppercase;letter-spacing:0.1em}
+.analytics-card .metric-value{font-size:0.95rem;font-weight:700;color:#C8A96B;margin-top:3px}
+.analytics-card .metric-bar{height:2px;border-radius:1px;margin-top:5px;background:rgba(143,162,138,0.12);overflow:hidden}
+.analytics-card .metric-bar-fill{height:100%;border-radius:1px;background:#8FA28A;transition:width 0.5s ease}
+.bottom-stats{position:absolute;bottom:20px;right:20px;display:flex;gap:10px}
+.stat-pill{padding:7px 14px;background:rgba(6,6,16,0.7);backdrop-filter:blur(24px);border:1px solid rgba(143,162,138,0.1);border-radius:10px;font-size:0.66rem;color:rgba(247,244,237,0.55);display:flex;align-items:center;gap:6px}
+.stat-pill .value{color:#C8A96B;font-weight:600}
+.photo-mode-overlay{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:200;opacity:0;transition:opacity 0.4s ease}
+.photo-mode-overlay.active{opacity:1;pointer-events:auto}
+.photo-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:80%;border:1px solid rgba(200,169,107,0.25);border-radius:4px}
+.photo-frame::before,.photo-frame::after{content:'';position:absolute;width:18px;height:18px;border:2px solid #C8A96B}
+.photo-frame::before{top:-2px;left:-2px;border-right:none;border-bottom:none}
+.photo-frame::after{bottom:-2px;right:-2px;border-left:none;border-top:none}
+.photo-controls{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);display:flex;gap:12px}
+.photo-btn{padding:9px 18px;background:rgba(6,6,16,0.85);backdrop-filter:blur(20px);border:1px solid rgba(200,169,107,0.3);border-radius:10px;color:#C8A96B;font-size:0.72rem;cursor:pointer;transition:all 0.25s;font-family:'Inter',sans-serif}
+.photo-btn:hover{background:rgba(200,169,107,0.18)}
+.alert-banner{position:fixed;top:74px;left:50%;transform:translateX(-50%) translateY(-100%);padding:9px 22px;background:rgba(180,30,30,0.95);backdrop-filter:blur(12px);border-radius:10px;font-size:0.78rem;font-weight:600;color:#fff;z-index:250;transition:transform 0.4s cubic-bezier(0.16,1,0.3,1);display:flex;align-items:center;gap:10px}
+.alert-banner.show{transform:translateX(-50%) translateY(0)}
+.alert-banner .alert-icon{width:18px;height:18px;flex-shrink:0}
+.mini-globe{position:fixed;top:80px;right:20px;width:110px;height:110px;border-radius:50%;overflow:hidden;border:2px solid rgba(143,162,138,0.18);background:rgba(6,6,16,0.6);backdrop-filter:blur(10px);z-index:100}
+.mini-globe canvas{width:100%!important;height:100%!important}
+.ai-chat-widget{position:fixed;bottom:20px;left:20px;width:310px;background:rgba(6,6,16,0.9);backdrop-filter:blur(28px);border:1px solid rgba(143,162,138,0.14);border-radius:16px;overflow:hidden;z-index:150;transform:translateY(calc(100% + 20px));transition:transform 0.4s cubic-bezier(0.16,1,0.3,1)}
+.ai-chat-widget.open{transform:translateY(0)}
+.ai-chat-header{padding:13px 15px;background:rgba(200,169,107,0.08);border-bottom:1px solid rgba(143,162,138,0.08);display:flex;align-items:center;gap:9px}
+.ai-chat-header .ai-avatar{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#C8A96B,#8FA28A);display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:#060610}
+.ai-chat-header .ai-title{font-size:0.78rem;font-weight:600;color:#F7F4ED}
+.ai-chat-header .ai-status{font-size:0.62rem;color:#8FA28A;margin-left:auto}
+.ai-chat-messages{padding:11px;max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:9px}
+.ai-message{padding:9px 11px;border-radius:11px;font-size:0.72rem;line-height:1.5;max-width:86%}
+.ai-message.user{align-self:flex-end;background:rgba(200,169,107,0.14);color:#F7F4ED;border-bottom-right-radius:3px}
+.ai-message.bot{align-self:flex-start;background:rgba(143,162,138,0.09);color:#C7D3C0;border-bottom-left-radius:3px}
+.ai-chat-input{padding:9px 11px;border-top:1px solid rgba(143,162,138,0.09);display:flex;gap:7px}
+.ai-chat-input input{flex:1;background:rgba(143,162,138,0.07);border:1px solid rgba(143,162,138,0.13);border-radius:9px;padding:7px 11px;color:#F7F4ED;font-size:0.72rem;outline:none;font-family:'Inter',sans-serif}
+.ai-chat-input input::placeholder{color:rgba(247,244,237,0.28)}
+.ai-chat-input button{padding:7px 13px;background:#C8A96B;border:none;border-radius:9px;color:#060610;font-size:0.68rem;font-weight:600;cursor:pointer;transition:opacity 0.2s;font-family:'Inter',sans-serif}
+.ai-chat-input button:hover{opacity:0.82}
+.ai-chat-toggle{position:fixed;bottom:20px;left:20px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#C8A96B,#8FA28A);border:none;color:#060610;font-size:1rem;font-weight:700;cursor:pointer;z-index:151;box-shadow:0 4px 24px rgba(200,169,107,0.35);transition:transform 0.3s,opacity 0.3s;display:flex;align-items:center;justify-content:center}
+.ai-chat-toggle:hover{transform:scale(1.1)}
+.ai-chat-toggle.hidden{opacity:0;pointer-events:none}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.animate-in{animation:fadeInUp 0.7s ease forwards}
+.delay-1{animation-delay:0.1s;opacity:0}
+.delay-2{animation-delay:0.2s;opacity:0}
+.delay-3{animation-delay:0.3s;opacity:0}
+/* HUNYUAN MODAL */
+.hunyuan-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(6,6,16,0.96);backdrop-filter:blur(24px);z-index:500;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+.hunyuan-modal.open{display:flex}
+.hm-title{font-size:1.6rem;font-weight:300;color:#F7F4ED;letter-spacing:0.15em;margin-bottom:4px;text-align:center}
+.hm-subtitle{font-size:0.72rem;color:#8FA28A;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:28px;text-align:center}
+.hm-layout{display:flex;gap:20px;align-items:flex-start;width:92%;max-width:980px}
+.hm-panel{flex:1;background:rgba(255,255,255,0.025);border:1px solid rgba(143,162,138,0.14);border-radius:16px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.hm-panel-title{font-size:0.68rem;color:#8FA28A;letter-spacing:0.18em;text-transform:uppercase}
+.hm-preview-area{width:100%;height:250px;border:2px dashed rgba(200,169,107,0.22);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;position:relative;background:rgba(0,0,0,0.35)}
+.hm-preview-area video,.hm-preview-area canvas,.hm-preview-area img{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0;border-radius:10px}
+.hm-placeholder{color:rgba(247,244,237,0.38);text-align:center;font-size:0.72rem;line-height:2;z-index:1}
+.hm-3d-viewer{width:100%;height:250px;border-radius:12px;background:#060610;border:1px solid rgba(143,162,138,0.1);overflow:hidden;position:relative}
+.hm-3d-viewer canvas{width:100%!important;height:100%!important}
+.hm-3d-empty{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;color:rgba(247,244,237,0.3);font-size:0.7rem;pointer-events:none;width:100%}
+.hm-controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%}
+.hm-btn{padding:8px 16px;border:1px solid rgba(143,162,138,0.2);border-radius:9px;background:rgba(143,162,138,0.06);color:#F7F4ED;font-size:0.68rem;cursor:pointer;transition:all 0.25s;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:5px}
+.hm-btn:hover{background:rgba(143,162,138,0.14);border-color:rgba(143,162,138,0.32)}
+.hm-btn.primary{background:rgba(200,169,107,0.18);border-color:rgba(200,169,107,0.4);color:#C8A96B;font-weight:600}
+.hm-btn.primary:hover{background:rgba(200,169,107,0.28)}
+.hm-btn.close-btn{background:rgba(100,30,30,0.15);border-color:rgba(204,51,51,0.3);color:#ff8888}
+.hm-btn:disabled{opacity:0.38;cursor:not-allowed}
+.hm-status{font-size:0.68rem;color:#8FA28A;text-align:center;padding:4px 10px;background:rgba(143,162,138,0.06);border-radius:7px;width:100%;min-height:24px;transition:all 0.3s}
+.hm-status.processing{color:#C8A96B;animation:pulse 1.2s ease-in-out infinite}
+.hm-status.success{color:#4caf50}
+.hm-status.error{color:#f44336}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.45}}
+.hm-model-info{font-size:0.6rem;color:rgba(247,244,237,0.38);text-align:center;padding:5px;background:rgba(200,169,107,0.05);border-radius:7px;width:100%}
+.hm-progress{width:100%;height:2px;background:rgba(143,162,138,0.12);border-radius:1px;overflow:hidden}
+.hm-progress-fill{height:100%;background:linear-gradient(90deg,#8FA28A,#C8A96B);width:0%;transition:width 0.4s ease}
+.diff-label{font-size:0.6rem;color:#C8A96B;letter-spacing:0.12em;text-transform:uppercase;background:rgba(200,169,107,0.1);padding:2px 9px;border-radius:5px}
+.hm-arrow{font-size:2rem;color:rgba(200,169,107,0.4);align-self:center;flex-shrink:0;margin-top:55px}
+input[type=file]#hm-file-input{display:none}
+@media(max-width:768px){.sidebar{width:256px}.hm-layout{flex-direction:column}.hm-arrow{margin-top:0;transform:rotate(90deg)}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="loading-screen">
+  <div class="loading-title">Coastal City</div>
+  <div class="loading-badge">Phase 3 · Perfect Edition</div>
+  <div class="loading-subtitle">Grid City · Hunyuan3D-2 · Port 9000</div>
+  <div class="loading-bar-container"><div class="loading-bar" id="loading-bar"></div></div>
+  <div class="loading-text" id="loading-text">Initializing grid-based city layout...</div>
+  <div class="phase-tag">NEW LOCALHOST · PORT 9000 · HUNYUAN3D-2</div>
+</div>
+<div id="canvas-container"></div>
+<div class="mini-globe" id="mini-globe"></div>
+<div class="alert-banner" id="alert-banner">
+  <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  <span id="alert-text">Disaster Alert Active</span>
+</div>
+<div class="ui-overlay" id="ui-overlay" style="opacity:0;transition:opacity 1s ease;">
+  <div class="top-bar animate-in delay-1">
+    <div class="logo">COASTAL CITY</div>
+    <div class="phase-label">PHASE 3</div>
+    <div class="divider"></div>
+    <div class="time-display" id="time-display">12:00 PM</div>
+    <div class="divider"></div>
+    <div class="fps-counter" id="fps-counter">60 FPS</div>
+    <div class="alert-badge" id="alert-badge">LIVE</div>
+  </div>
+  <div class="sidebar animate-in delay-2">
+    <div class="panel-section">
+      <div class="panel-title">Time of Day</div>
+      <div class="time-slider-container">
+        <input type="range" class="time-slider" id="time-slider" min="0" max="24" step="0.1" value="12">
+        <div class="time-labels"><span>12AM</span><span>6AM</span><span>12PM</span><span>6PM</span><span>12AM</span></div>
+        <div class="current-time-label" id="current-time-label">Noon</div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Weather</div>
+      <div class="weather-grid">
+        <button class="weather-btn active" data-weather="sunny"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>Sunny</button>
+        <button class="weather-btn" data-weather="cloudy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>Cloudy</button>
+        <button class="weather-btn" data-weather="rain"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 16.2A4.5 4.5 0 0 0 3.2 14.2C1.4 12.4 0 10 0 7a5 5 0 0 1 9-3 7 7 0 0 1 13 4c0 2-1 4-2 8.2z"/><path d="M8 18v2m4-2v2m4-2v2"/></svg>Rain</button>
+        <button class="weather-btn" data-weather="storm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Storm</button>
+        <button class="weather-btn" data-weather="fog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14h16M4 18h16M4 10h16M4 6h16"/></svg>Fog</button>
+        <button class="weather-btn" data-weather="wind"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>Wind</button>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Camera Mode</div>
+      <div class="camera-grid">
+        <button class="camera-btn active" data-camera="orbit">Orbit</button>
+        <button class="camera-btn" data-camera="drone">Drone</button>
+        <button class="camera-btn" data-camera="street">Street</button>
+        <button class="camera-btn" data-camera="cinematic">Cinematic</button>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Environment</div>
+      <div class="toggle-row"><span class="toggle-label">Auto Day/Night</span><div class="toggle-switch active" id="auto-time-toggle"></div></div>
+      <div class="toggle-row"><span class="toggle-label">Traffic</span><div class="toggle-switch active" id="traffic-toggle"></div></div>
+      <div class="toggle-row"><span class="toggle-label">Pedestrians</span><div class="toggle-switch active" id="pedestrians-toggle"></div></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title phase3">Hunyuan3D-2 · 2D to 3D</div>
+      <button class="action-btn hunyuan" id="open-hunyuan-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M12 3v3m0 12v3M3 12h3m12 0h3"/></svg>
+        OPEN CAMERA to 3D
+      </button>
+      <div style="margin-top:7px;font-size:0.6rem;color:rgba(247,244,237,0.3);text-align:center;line-height:1.6">Opens laptop camera · Converts 2D image to 3D model via Hunyuan3D-2 on port 9000</div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title phase3">AI Disaster Prediction</div>
+      <div class="prediction-grid">
+        <div class="prediction-card"><div class="risk-label">Flood Risk</div><div class="risk-value risk-low" id="flood-risk-val">12%</div><div class="risk-bar"><div class="risk-bar-fill fill-low" id="flood-risk-bar" style="width:12%"></div></div></div>
+        <div class="prediction-card"><div class="risk-label">Storm Risk</div><div class="risk-value risk-low" id="storm-risk-val">8%</div><div class="risk-bar"><div class="risk-bar-fill fill-low" id="storm-risk-bar" style="width:8%"></div></div></div>
+        <div class="prediction-card"><div class="risk-label">Traffic Risk</div><div class="risk-value risk-med" id="traffic-risk-val">34%</div><div class="risk-bar"><div class="risk-bar-fill fill-med" id="traffic-risk-bar" style="width:34%"></div></div></div>
+        <div class="prediction-card"><div class="risk-label">Heat Risk</div><div class="risk-value risk-low" id="heat-risk-val">5%</div><div class="risk-bar"><div class="risk-bar-fill fill-low" id="heat-risk-bar" style="width:5%"></div></div></div>
+      </div>
+      <div class="prediction-timeline">
+        <div class="timeline-row"><div class="timeline-dot"></div><div class="timeline-label">24h</div><div class="timeline-value" id="pred-24h">Low risk period</div></div>
+        <div class="timeline-row"><div class="timeline-dot"></div><div class="timeline-label">48h</div><div class="timeline-value" id="pred-48h">Moderate tide expected</div></div>
+        <div class="timeline-row"><div class="timeline-dot alert"></div><div class="timeline-label">72h</div><div class="timeline-value" id="pred-72h">Storm surge warning</div></div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title phase3">Flood Simulation</div>
+      <div class="time-slider-container">
+        <input type="range" class="flood-slider" id="flood-slider" min="0" max="20" step="0.1" value="0">
+        <div class="slider-labels"><span>0m</span><span>5m</span><span>10m</span><span>15m</span><span>20m</span></div>
+        <div class="current-time-label" id="flood-level-label" style="color:#4488cc">Water Level: 0.0m</div>
+      </div>
+      <div class="toggle-row" style="margin-top:8px"><span class="toggle-label">Show Evacuation Routes</span><div class="toggle-switch" id="evac-toggle"></div></div>
+      <div class="toggle-row"><span class="toggle-label">Auto Flood (AI)</span><div class="toggle-switch" id="auto-flood-toggle"></div></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title phase3">Disaster Simulation</div>
+      <div class="time-slider-container">
+        <input type="range" class="disaster-slider" id="earthquake-slider" min="0" max="10" step="0.1" value="0">
+        <div class="slider-labels"><span>0</span><span>2.5</span><span>5</span><span>7.5</span><span>10</span></div>
+        <div class="current-time-label" id="earthquake-label" style="color:#cc4444">Earthquake: 0.0 Richter</div>
+      </div>
+      <div style="display:flex;gap:7px;margin-top:9px">
+        <button class="action-btn danger" id="fire-sim-btn" style="flex:1;font-size:0.65rem;padding:7px">Fire Sim</button>
+        <button class="action-btn danger" id="quake-sim-btn" style="flex:1;font-size:0.65rem;padding:7px">Quake</button>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title phase3">Digital Twin Analytics</div>
+      <div class="analytics-grid">
+        <div class="analytics-card"><div class="metric-label">Population</div><div class="metric-value" id="metric-pop">142,580</div><div class="metric-bar"><div class="metric-bar-fill" style="width:72%"></div></div></div>
+        <div class="analytics-card"><div class="metric-label">Traffic Flow</div><div class="metric-value" id="metric-traffic">8,420</div><div class="metric-bar"><div class="metric-bar-fill" style="width:45%"></div></div></div>
+        <div class="analytics-card"><div class="metric-label">Energy Use</div><div class="metric-value" id="metric-energy">234 MW</div><div class="metric-bar"><div class="metric-bar-fill" style="width:60%"></div></div></div>
+        <div class="analytics-card"><div class="metric-label">Air Quality</div><div class="metric-value" id="metric-aqi">AQI 42</div><div class="metric-bar"><div class="metric-bar-fill" style="width:42%"></div></div></div>
+      </div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">Actions</div>
+      <button class="action-btn primary" id="photo-mode-btn"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg>Photo Mode</button>
+      <button class="action-btn" id="reset-btn" style="margin-top:7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Reset Scene</button>
+      <button class="action-btn" id="fullscreen-btn" style="margin-top:7px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>Fullscreen</button>
+    </div>
+  </div>
+  <div class="bottom-stats animate-in delay-3">
+    <div class="stat-pill"><span>Weather:</span><span class="value" id="stat-weather">Sunny</span></div>
+    <div class="stat-pill"><span>Time:</span><span class="value" id="stat-time">12:00</span></div>
+    <div class="stat-pill"><span>Objects:</span><span class="value" id="stat-objects">0</span></div>
+    <div class="stat-pill"><span>AI:</span><span class="value" id="stat-ai">Active</span></div>
+  </div>
+</div>
+<div class="photo-mode-overlay" id="photo-mode-overlay">
+  <div class="photo-frame"></div>
+  <div class="photo-controls">
+    <button class="photo-btn" id="photo-capture">Capture</button>
+    <button class="photo-btn" id="photo-exit">Exit</button>
+  </div>
+</div>
+<!-- HUNYUAN 3D MODAL -->
+<div class="hunyuan-modal" id="hunyuan-modal">
+  <div class="hm-title">2D to 3D Reconstruction</div>
+  <div class="hm-subtitle">Powered by Hunyuan3D-2 via Port 9000</div>
+  <div class="hm-layout">
+    <div class="hm-panel">
+      <div class="diff-label">INPUT — 2D</div>
+      <div class="hm-panel-title">Camera or Uploaded Image</div>
+      <div class="hm-preview-area" id="hm-preview-area">
+        <video id="hm-video" autoplay playsinline style="display:none"></video>
+        <canvas id="hm-snapshot-canvas" style="display:none"></canvas>
+        <img id="hm-uploaded-img" style="display:none" alt="Uploaded">
+        <div class="hm-placeholder" id="hm-placeholder">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg><br>
+          Click "Start Camera" or "Upload Image"
+        </div>
+      </div>
+      <div class="hm-controls">
+        <button class="hm-btn primary" id="hm-start-cam">Start Camera</button>
+        <button class="hm-btn" id="hm-upload-btn">Upload Image</button>
+        <input type="file" id="hm-file-input" accept="image/*">
+        <button class="hm-btn primary" id="hm-snap-btn" disabled>Convert to 3D</button>
+      </div>
+      <div class="hm-status" id="hm-status">Ready — start camera or upload image</div>
+      <div class="hm-progress"><div class="hm-progress-fill" id="hm-progress-fill"></div></div>
+    </div>
+    <div class="hm-arrow">&#8594;</div>
+    <div class="hm-panel">
+      <div class="diff-label">OUTPUT — 3D</div>
+      <div class="hm-panel-title">Hunyuan3D-2 Generated Model</div>
+      <div class="hm-3d-viewer" id="hm-3d-viewer">
+        <div class="hm-3d-empty" id="hm-3d-empty">
+          <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.3"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg><br>
+          3D model appears here after conversion
+        </div>
+      </div>
+      <div class="hm-model-info" id="hm-model-info">No model loaded yet</div>
+      <div class="hm-controls">
+        <button class="hm-btn" id="hm-download-btn" disabled>Download .glb</button>
+        <button class="hm-btn primary" id="hm-place-in-city-btn" disabled>Place in City</button>
+        <button class="hm-btn close-btn" id="hm-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<button class="ai-chat-toggle" id="ai-chat-toggle">AI</button>
+<div class="ai-chat-widget" id="ai-chat-widget">
+  <div class="ai-chat-header">
+    <div class="ai-avatar">AI</div>
+    <div class="ai-title">City Assistant</div>
+    <div class="ai-status">Phase 3 Online</div>
+  </div>
+  <div class="ai-chat-messages" id="ai-chat-messages">
+    <div class="ai-message bot">Phase 3 active! Grid city layout — vehicles only on roads, buildings only in city blocks, park zone properly bounded. Hunyuan3D-2 ready on port 9000!</div>
+  </div>
+  <div class="ai-chat-input">
+    <input type="text" id="ai-chat-input" placeholder="Ask about weather, floods, 3D...">
+    <button id="ai-chat-send">Send</button>
+  </div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const state = {
+  time:12,weather:'sunny',cameraMode:'orbit',autoTime:true,trafficEnabled:true,
+  pedestriansEnabled:true,soundEnabled:false,photoMode:false,
+  introComplete:false,fps:60,frameCount:0,lastFpsTime:performance.now(),
+  floodLevel:0,autoFlood:false,showEvacuation:false,
+  earthquakeIntensity:0,fireSimulation:false,aiActive:true,
+};
+
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x87CEEB,0.0018);
+
+const camera = new THREE.PerspectiveCamera(58,window.innerWidth/window.innerHeight,0.1,2000);
+const renderer = new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',preserveDrawingBuffer:true});
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.1;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+container.appendChild(renderer.domElement);
+
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloomPass=new UnrealBloomPass(new THREE.Vector2(window.innerWidth,window.innerHeight),0.35,0.4,0.82);
+composer.addPass(bloomPass);
+
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=0.05;
+controls.maxPolarAngle=Math.PI/2.08;controls.minDistance=5;controls.maxDistance=350;
+controls.target.set(0,5,0);
+
+const C={road:0x252525,sidewalk:0x888888,grass:0x4a7c59,parkGrass:0x3a6e49,
+  ocean:0x1a5f7a,sand:0xE8DCC8,buildingGlass:0x87CEEB,buildingConcrete:0xCCCCCC,
+  buildingLight:0xEEEEEE,buildingDark:0x5a5a5a,
+  nightSky:0x050510,daySky:0x87CEEB,sunsetSky:0xFF7830};
+
+// LIGHTS
+const ambientLight=new THREE.AmbientLight(0xffffff,0.35); scene.add(ambientLight);
+const sunLight=new THREE.DirectionalLight(0xfffbe8,1.6);
+sunLight.position.set(50,120,50);sunLight.castShadow=true;
+sunLight.shadow.mapSize.width=4096;sunLight.shadow.mapSize.height=4096;
+sunLight.shadow.camera.near=0.5;sunLight.shadow.camera.far=600;
+sunLight.shadow.camera.left=-200;sunLight.shadow.camera.right=200;
+sunLight.shadow.camera.top=200;sunLight.shadow.camera.bottom=-200;
+sunLight.shadow.bias=-0.0004;
+scene.add(sunLight);
+const moonLight=new THREE.DirectionalLight(0x6688aa,0.35);
+moonLight.position.set(-50,80,-50);moonLight.visible=false;scene.add(moonLight);
+const hemiLight=new THREE.HemisphereLight(0x87CEEB,0x4a7c59,0.5);scene.add(hemiLight);
+
+// SKY & STARS
+const skyMat=new THREE.MeshBasicMaterial({color:C.daySky,side:THREE.BackSide});
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(900,32,32),skyMat));
+const starsGeo=new THREE.BufferGeometry();
+const sP=new Float32Array(3500*3);
+for(let i=0;i<3500*3;i+=3){const t=Math.random()*Math.PI*2,p=Math.acos(Math.random()*2-1),r=800;sP[i]=r*Math.sin(p)*Math.cos(t);sP[i+1]=r*Math.sin(p)*Math.sin(t);sP[i+2]=r*Math.cos(p);}
+starsGeo.setAttribute('position',new THREE.BufferAttribute(sP,3));
+const starsMat=new THREE.PointsMaterial({color:0xffffff,size:1.4,transparent:true,opacity:0});
+scene.add(new THREE.Points(starsGeo,starsMat));
+
+// GROUND
+const groundMat=new THREE.MeshStandardMaterial({color:C.grass,roughness:0.9});
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(500,500,50,50),groundMat);
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+
+// OCEAN
+const oceanGeo=new THREE.PlaneGeometry(500,250,80,40);
+const oceanMat=new THREE.MeshStandardMaterial({color:C.ocean,roughness:0.1,metalness:0.85,transparent:true,opacity:0.87});
+const ocean=new THREE.Mesh(oceanGeo,oceanMat);
+ocean.rotation.x=-Math.PI/2;ocean.position.set(0,-1.5,-130);scene.add(ocean);
+const oceanOrigPos=oceanGeo.attributes.position.clone();
+
+const beach=new THREE.Mesh(new THREE.PlaneGeometry(500,30),new THREE.MeshStandardMaterial({color:C.sand,roughness:1.0}));
+beach.rotation.x=-Math.PI/2;beach.position.set(0,0.05,-50);beach.receiveShadow=true;scene.add(beach);
+
+// FLOOD
+const floodGeo=new THREE.PlaneGeometry(500,500,50,50);
+const floodMat=new THREE.MeshStandardMaterial({color:0x2266aa,roughness:0.05,metalness:0.9,transparent:true,opacity:0.72});
+const floodWater=new THREE.Mesh(floodGeo,floodMat);
+floodWater.rotation.x=-Math.PI/2;floodWater.position.set(0,-10,0);floodWater.visible=false;scene.add(floodWater);
+
+// ============================================================
+// GRID ROAD SYSTEM
+// ============================================================
+function createRoad(x,z,width,length,isNS){
+  const geo=new THREE.PlaneGeometry(isNS?width:length,isNS?length:width);
+  const mat=new THREE.MeshStandardMaterial({color:C.road,roughness:0.88});
+  const road=new THREE.Mesh(geo,mat);
+  road.rotation.x=-Math.PI/2;road.position.set(x,0.02,z);road.receiveShadow=true;scene.add(road);
+  if(width>8){
+    const lineGeo=new THREE.PlaneGeometry(isNS?0.22:length,isNS?length:0.22);
+    const line=new THREE.Mesh(lineGeo,new THREE.MeshBasicMaterial({color:0xffffff}));
+    line.rotation.x=-Math.PI/2;line.position.set(x,0.035,z);scene.add(line);
+  }
+}
+function createSidewalk(x,z,w,l){
+  const sw=new THREE.Mesh(new THREE.PlaneGeometry(w,l),new THREE.MeshStandardMaterial({color:0x9a9a9a,roughness:0.85}));
+  sw.rotation.x=-Math.PI/2;sw.position.set(x,0.04,z);sw.receiveShadow=true;scene.add(sw);
+}
+
+// Main roads
+createRoad(0,0,14,280,true);   // Main N-S road at x=0
+createRoad(0,0,280,14,false);  // Main E-W road at z=0
+createRoad(-60,20,10,140,true); // Secondary N-S
+createRoad(60,20,10,140,true);
+createRoad(0,-40,160,10,false); // Secondary E-W
+createRoad(0,40,160,10,false);
+createRoad(0,80,160,10,false);
+
+// Sidewalks
+createSidewalk(0,9,280,3);
+createSidewalk(0,-9,280,3);
+createSidewalk(9,0,3,280);
+createSidewalk(-9,0,3,280);
+
+// ============================================================
+// BUILDINGS — GRID BLOCKS ONLY
+// ============================================================
+const buildings=[], buildingLights=[], buildingOrigPos=[];
+
+function createBuilding(x,z,w,d,h,type){
+  const g=new THREE.Group();
+  g.position.set(x,0,z);
+  let mat;
+  if(type==='skyscraper') mat=new THREE.MeshStandardMaterial({color:C.buildingGlass,roughness:0.08,metalness:0.92,transparent:true,opacity:0.72});
+  else if(type==='modern') mat=new THREE.MeshStandardMaterial({color:C.buildingLight,roughness:0.28,metalness:0.4});
+  else if(type==='residential') mat=new THREE.MeshStandardMaterial({color:C.buildingConcrete,roughness:0.7,metalness:0.1});
+  else mat=new THREE.MeshStandardMaterial({color:C.buildingDark,roughness:0.5,metalness:0.28});
+
+  const body=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+  body.position.y=h/2;body.castShadow=true;body.receiveShadow=true;g.add(body);
+
+  const winRows=Math.floor(h/3.5),winCols=Math.floor(w/3);
+  for(let r=0;r<winRows;r++){
+    for(let c=0;c<winCols;c++){
+      const wMat=new THREE.MeshStandardMaterial({color:0x87CEEB,roughness:0.05,metalness:0.95,emissive:0x223344,emissiveIntensity:0.08});
+      const win=new THREE.Mesh(new THREE.PlaneGeometry(1.4,1.8),wMat);
+      win.position.set(-w/2+1.8+c*3,2.5+r*3.5,d/2+0.01);g.add(win);buildingLights.push(wMat);
+      const wb=win.clone();wb.position.z=-d/2-0.01;wb.rotation.y=Math.PI;g.add(wb);buildingLights.push(wb.material);
+    }
+  }
+  if(h>20){
+    const ant=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,5,8),new THREE.MeshStandardMaterial({color:0x888888}));
+    ant.position.y=h+2.5;g.add(ant);
+    const bMat=new THREE.MeshStandardMaterial({color:0xff0000,emissive:0xff0000,emissiveIntensity:2});
+    const beacon=new THREE.Mesh(new THREE.SphereGeometry(0.22,8,8),bMat);
+    beacon.position.y=h+5;g.add(beacon);
+  }
+  if(type==='residential'&&h>10){
+    for(let i=1;i<h/5;i++){
+      const bal=new THREE.Mesh(new THREE.BoxGeometry(w+0.8,0.25,1.8),new THREE.MeshStandardMaterial({color:0xaaaaaa}));
+      bal.position.set(0,i*5,d/2+0.8);g.add(bal);
+    }
+  }
+  scene.add(g);buildings.push(g);buildingOrigPos.push(new THREE.Vector3(x,0,z));
+  return g;
+}
+
+function populateBlock(xMin,xMax,zMin,zMax,type,heightMin,heightMax){
+  const bW=xMax-xMin,bD=zMax-zMin;
+  const cols=Math.max(1,Math.floor(bW/20)),rows=Math.max(1,Math.floor(bD/20));
+  const cW=bW/cols,cD=bD/rows;
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const cx=xMin+(c+0.5)*cW+(Math.random()-0.5)*3;
+      const cz=zMin+(r+0.5)*cD+(Math.random()-0.5)*3;
+      // Guard against roads
+      if(Math.abs(cx)<10||Math.abs(cz)<10) continue;
+      if(Math.abs(cx-60)<8||Math.abs(cx+60)<8) continue;
+      if(Math.abs(cz-40)<7||Math.abs(cz+40)<7) continue;
+      if(Math.abs(cz-80)<7||Math.abs(cz+80)<7) continue;
+      const bw=6+Math.random()*8,bd=6+Math.random()*8;
+      const bh=heightMin+Math.random()*(heightMax-heightMin);
+      createBuilding(cx,cz,bw,bd,bh,type);
+    }
+  }
+}
+
+// Downtown core — skyscrapers
+populateBlock(-55,-12,8,35,'skyscraper',35,85);
+populateBlock(12,55,8,35,'skyscraper',35,85);
+// Midtown — modern
+populateBlock(-55,-12,-38,-12,'modern',15,32);
+populateBlock(12,55,-38,-12,'modern',15,32);
+// Uptown — residential
+populateBlock(-55,-12,45,75,'residential',8,22);
+populateBlock(12,55,45,75,'modern',10,28);
+// Outer west
+populateBlock(-115,-65,-35,75,'residential',6,18);
+// Outer east (excluding park zone x:65-125, z:18-84)
+populateBlock(65,125,-35,14,'modern',8,22);
+// Landmark buildings
+createBuilding(-28,0,22,16,65,'skyscraper');
+createBuilding(28,0,18,14,58,'skyscraper');
+
+// ============================================================
+// TREES
+// ============================================================
+const trees=[];
+function createTree(x,z,s,type){
+  const g=new THREE.Group();
+  g.position.set(x,0,z);g.scale.setScalar(s||1);
+  const trunk=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.45,3,8),new THREE.MeshStandardMaterial({color:0x5c4033}));
+  trunk.position.y=1.5;trunk.castShadow=true;g.add(trunk);
+  if(type==='palm'){
+    const f=new THREE.Mesh(new THREE.SphereGeometry(2,8,6),new THREE.MeshStandardMaterial({color:0x4a7c3f}));
+    f.position.y=4.5;f.scale.y=0.5;f.castShadow=true;g.add(f);
+  } else {
+    const fMat=new THREE.MeshStandardMaterial({color:0x8FA28A});
+    const f=new THREE.Mesh(new THREE.SphereGeometry(2.4,8,6),fMat);
+    f.position.y=4.2;f.castShadow=true;g.add(f);
+    const f2=new THREE.Mesh(new THREE.SphereGeometry(1.6,8,6),fMat);
+    f2.position.y=5.8;f2.castShadow=true;g.add(f2);
+  }
+  scene.add(g);trees.push({mesh:g,type});
+  return g;
+}
+// Sidewalk trees along N-S main road
+for(let z=-90;z<=90;z+=16){if(Math.abs(z)<11) continue;createTree(12,z,0.85+Math.random()*0.3);createTree(-12,z,0.85+Math.random()*0.3);}
+// Sidewalk trees along E-W main road
+for(let x=-90;x<=90;x+=16){if(Math.abs(x)<11) continue;createTree(x,12,0.8+Math.random()*0.3);createTree(x,-12,0.8+Math.random()*0.3);}
+// Palm trees beach
+for(let x=-100;x<=100;x+=14) createTree(x,-37,1.1+Math.random()*0.3,'palm');
+// Park trees
+for(let i=0;i<30;i++) createTree(70+Math.random()*50,20+Math.random()*60,0.8+Math.random()*0.5);
+
+// ============================================================
+// PARK ZONE (x: 65-125, z: 15-85) — perfectly bounded
+// ============================================================
+const parkMesh=new THREE.Mesh(new THREE.PlaneGeometry(60,70),new THREE.MeshStandardMaterial({color:C.parkGrass,roughness:0.9}));
+parkMesh.rotation.x=-Math.PI/2;parkMesh.position.set(95,0.03,50);parkMesh.receiveShadow=true;scene.add(parkMesh);
+
+// Park paths
+const pathMat=new THREE.MeshStandardMaterial({color:0xb8a888});
+const pp1=new THREE.Mesh(new THREE.PlaneGeometry(2,66),pathMat);
+pp1.rotation.x=-Math.PI/2;pp1.position.set(95,0.05,50);scene.add(pp1);
+const pp2=new THREE.Mesh(new THREE.PlaneGeometry(56,2),pathMat);
+pp2.rotation.x=-Math.PI/2;pp2.position.set(95,0.05,50);scene.add(pp2);
+
+// FOUNTAIN at park center (95, 0, 50)
+const fountainGroup=new THREE.Group();
+fountainGroup.position.set(95,0,50);
+const basin=new THREE.Mesh(new THREE.CylinderGeometry(5,5,0.5,32),new THREE.MeshStandardMaterial({color:0x999999,roughness:0.4}));
+basin.position.y=0.25;basin.receiveShadow=true;fountainGroup.add(basin);
+const fCenter=new THREE.Mesh(new THREE.CylinderGeometry(0.5,1.2,2.5,16),new THREE.MeshStandardMaterial({color:0xbbbbbb}));
+fCenter.position.y=1.25;fountainGroup.add(fCenter);
+const rim=new THREE.Mesh(new THREE.TorusGeometry(5,0.25,8,32),new THREE.MeshStandardMaterial({color:0x888888}));
+rim.rotation.x=Math.PI/2;rim.position.y=0.5;fountainGroup.add(rim);
+scene.add(fountainGroup);
+
+// Fountain particles
+const fountainParticles=[];
+for(let i=0;i<60;i++){
+  const drop=new THREE.Mesh(new THREE.SphereGeometry(0.04,4,4),new THREE.MeshBasicMaterial({color:0x87CEEB,transparent:true,opacity:0.7}));
+  drop.position.copy(fountainGroup.position);drop.position.y+=2.5;scene.add(drop);
+  fountainParticles.push({mesh:drop,base:fountainGroup.position.clone(),vel:new THREE.Vector3((Math.random()-0.5)*0.18,0.12+Math.random()*0.16,(Math.random()-0.5)*0.18),life:Math.random()*80});
+}
+
+// FERRIS WHEEL in park at (82, 0, 32)
+const ferrisGroup=new THREE.Group();
+ferrisGroup.position.set(82,0,32);
+const fSupMat=new THREE.MeshStandardMaterial({color:0x555555});
+const s1=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.5,15,8),fSupMat);
+s1.position.set(-4,7.5,0);s1.rotation.z=0.28;ferrisGroup.add(s1);
+const s2=new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.5,15,8),fSupMat);
+s2.position.set(4,7.5,0);s2.rotation.z=-0.28;ferrisGroup.add(s2);
+const fBase=new THREE.Mesh(new THREE.BoxGeometry(10,0.5,0.8),fSupMat);
+fBase.position.y=0.25;ferrisGroup.add(fBase);
+const fWheel=new THREE.Mesh(new THREE.TorusGeometry(10,0.3,8,36),new THREE.MeshStandardMaterial({color:0x888888}));
+fWheel.position.y=15;ferrisGroup.add(fWheel);
+const cabColors=[0xcc3333,0x3366cc,0x33cc66,0xcccc33,0x9933cc,0x33cccc];
+for(let i=0;i<12;i++){
+  const ang=(i/12)*Math.PI*2;
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(1.5,1.5,1.5),new THREE.MeshStandardMaterial({color:cabColors[i%6]}));
+  cab.position.set(Math.cos(ang)*10,15+Math.sin(ang)*10,0);ferrisGroup.add(cab);
+}
+scene.add(ferrisGroup);
+
+// Park benches — ring around fountain
+const benchMat=new THREE.MeshStandardMaterial({color:0x8B4513});
+const legMat=new THREE.MeshStandardMaterial({color:0x333333});
+for(let i=0;i<8;i++){
+  const ang=(i/8)*Math.PI*2;
+  const bg=new THREE.Group();
+  bg.position.set(95+Math.cos(ang)*13,0,50+Math.sin(ang)*13);
+  bg.rotation.y=ang;
+  const seat=new THREE.Mesh(new THREE.BoxGeometry(2.2,0.12,0.65),benchMat);
+  seat.position.y=0.5;seat.castShadow=true;bg.add(seat);
+  const back=new THREE.Mesh(new THREE.BoxGeometry(2.2,0.5,0.1),benchMat);
+  back.position.set(0,0.75,-0.28);bg.add(back);
+  [-0.8,0.8].forEach(lx=>{
+    const leg=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.5,0.6),legMat);
+    leg.position.set(lx,0.25,0);bg.add(leg);
+  });
+  scene.add(bg);
+}
+
+// Playground slide at (110, 0, 35)
+const slideGroup=new THREE.Group();
+slideGroup.position.set(110,0,35);
+const platMat=new THREE.MeshStandardMaterial({color:0xFF6B6B});
+const plat=new THREE.Mesh(new THREE.BoxGeometry(3,0.2,3),platMat);
+plat.position.y=3;slideGroup.add(plat);
+const rampMat=new THREE.MeshStandardMaterial({color:0x4ECDC4});
+const ramp=new THREE.Mesh(new THREE.BoxGeometry(1.5,0.15,4),rampMat);
+ramp.position.set(0,1.5,2.5);ramp.rotation.x=Math.PI/6;slideGroup.add(ramp);
+const pillarMat=new THREE.MeshStandardMaterial({color:0xFFBE0B});
+[[−1.2,1.75,−1.2],[1.2,1.75,−1.2],[−1.2,1.75,1.2],[1.2,1.75,1.2]].forEach(([px,py,pz])=>{
+  const p=new THREE.Mesh(new THREE.CylinderGeometry(0.15,0.15,3.5,8),pillarMat);
+  p.position.set(px,py,pz);p.castShadow=true;slideGroup.add(p);
+});
+scene.add(slideGroup);
+
+// Swing set at (108, 0, 65)
+const swingGroup=new THREE.Group();
+swingGroup.position.set(108,0,65);
+const swingFrameMat=new THREE.MeshStandardMaterial({color:0x666666});
+const lPole=new THREE.Mesh(new THREE.BoxGeometry(0.15,4,0.15),swingFrameMat);
+lPole.position.set(-3,2,0);swingGroup.add(lPole);
+const rPole=new THREE.Mesh(new THREE.BoxGeometry(0.15,4,0.15),swingFrameMat);
+rPole.position.set(3,2,0);swingGroup.add(rPole);
+const topBar=new THREE.Mesh(new THREE.BoxGeometry(6.3,0.15,0.15),swingFrameMat);
+topBar.position.y=4;swingGroup.add(topBar);
+const seatMat=new THREE.MeshStandardMaterial({color:0x3A86FF});
+const chainMat=new THREE.MeshStandardMaterial({color:0x888888});
+[-2,0,2].forEach(sx=>{
+  const seat=new THREE.Mesh(new THREE.BoxGeometry(0.8,0.08,0.4),seatMat);
+  seat.position.set(sx,2,0);seat.castShadow=true;swingGroup.add(seat);
+  const chain=new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,2,4),chainMat);
+  chain.position.set(sx,3,0);swingGroup.add(chain);
+});
+scene.add(swingGroup);
+
+// ============================================================
+// VEHICLE LANES — strictly on roads, locked to lane coordinates
+// ============================================================
+const roadLanes=[
+  {type:'EW',z:3,dir:1},{type:'EW',z:-3,dir:-1},
+  {type:'EW',z:-37,dir:1},{type:'EW',z:-43,dir:-1},
+  {type:'EW',z:37,dir:1},{type:'EW',z:43,dir:-1},
+  {type:'EW',z:77,dir:1},{type:'EW',z:83,dir:-1},
+  {type:'NS',x:3,dir:1},{type:'NS',x:-3,dir:-1},
+  {type:'NS',x:-57,dir:1},{type:'NS',x:-63,dir:-1},
+  {type:'NS',x:57,dir:1},{type:'NS',x:63,dir:-1},
+];
+
+const vehicles=[];
+const vColors=[0x333333,0x666666,0x999999,0xaaaaaa,0x1a3344,0x334422,0xFFD700,0x0055cc,0xcc0000];
+function createVehicle(vType,lane){
+  const g=new THREE.Group();
+  const col=vType==='taxi'?0xFFD700:vType==='bus'?0x0055cc:vType==='emergency'?0xcc0000:vColors[Math.floor(Math.random()*6)];
+  const bL=vType==='bus'?8:4.2,bW=vType==='bus'?2.5:2,bH=vType==='bus'?2.5:1.3;
+  const body=new THREE.Mesh(new THREE.BoxGeometry(bW,bH,bL),new THREE.MeshStandardMaterial({color:col}));
+  body.position.y=bH/2+0.35;body.castShadow=true;g.add(body);
+  if(vType!=='bus'){
+    const cab=new THREE.Mesh(new THREE.BoxGeometry(bW-0.2,0.75,bL*0.45),new THREE.MeshStandardMaterial({color:0x333333,transparent:true,opacity:0.8}));
+    cab.position.set(0,bH+0.1,−bL*0.08);g.add(cab);
+  }
+  const wMat=new THREE.MeshStandardMaterial({color:0x111111});
+  const wGeo=new THREE.CylinderGeometry(0.38,0.38,0.25,12);
+  const wPos=vType==='bus'?[[-1.15,0.38,-2.5],[1.15,0.38,-2.5],[-1.15,0.38,2.5],[1.15,0.38,2.5]]
+    :[[-0.9,0.38,-1.5],[0.9,0.38,-1.5],[-0.9,0.38,1.5],[0.9,0.38,1.5]];
+  wPos.forEach(([wx,wy,wz])=>{const w=new THREE.Mesh(wGeo,wMat);w.rotation.z=Math.PI/2;w.position.set(wx,wy,wz);g.add(w);});
+  const hlMat=new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffffcc,emissiveIntensity:0.8});
+  [-0.55,0.55].forEach(hx=>{const hl=new THREE.Mesh(new THREE.SphereGeometry(0.18,6,6),hlMat);hl.position.set(hx,bH/2+0.35,bL/2);g.add(hl);});
+  const tlMat=new THREE.MeshStandardMaterial({color:0xff2200,emissive:0xff2200,emissiveIntensity:0.5});
+  [-0.55,0.55].forEach(tx=>{const tl=new THREE.Mesh(new THREE.SphereGeometry(0.14,6,6),tlMat);tl.position.set(tx,bH/2+0.35,-bL/2);g.add(tl);});
+
+  if(lane.type==='EW'){
+    g.position.set((Math.random()-0.5)*200,0,lane.z);
+    g.rotation.y=lane.dir>0?Math.PI/2:-Math.PI/2;
+  } else {
+    g.position.set(lane.x,0,(Math.random()-0.5)*160);
+    g.rotation.y=lane.dir>0?0:Math.PI;
+  }
+  scene.add(g);
+  vehicles.push({mesh:g,lane,speed:(vType==='bus'?0.12:0.2+Math.random()*0.15),direction:lane.dir});
+  return g;
+}
+const vTypeList=['car','car','taxi','bus','car','car'];
+roadLanes.forEach((lane,li)=>{
+  const cnt=lane.type==='EW'?5:4;
+  for(let i=0;i<cnt;i++) createVehicle(vTypeList[(li+i)%vTypeList.length],lane);
+});
+
+// ============================================================
+// PEDESTRIANS — on sidewalks only
+// ============================================================
+const pedestrians=[];
+const swZones=[
+  {xMin:11,xMax:90,zMin:8,zMax:11,axis:'x'},
+  {xMin:11,xMax:90,zMin:-11,zMax:-8,axis:'x'},
+  {xMin:-90,xMax:-11,zMin:8,zMax:11,axis:'x'},
+  {xMin:-90,xMax:-11,zMin:-11,zMax:-8,axis:'x'},
+  {xMin:8,xMax:11,zMin:-90,zMax:90,axis:'z'},
+  {xMin:-11,xMax:-8,zMin:-90,zMax:90,axis:'z'},
+];
+const pedBodyColors=[0x3366cc,0xcc3333,0x33cc55,0xcc9933,0x9933cc,0xff6633];
+function createPedestrian(zone){
+  const g=new THREE.Group();
+  const bMat=new THREE.MeshStandardMaterial({color:pedBodyColors[Math.floor(Math.random()*6)]});
+  const body=new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,1.5,8),bMat);
+  body.position.y=0.75;body.castShadow=true;g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(0.22,8,8),new THREE.MeshStandardMaterial({color:0xffccaa}));
+  head.position.y=1.7;g.add(head);
+  const sx=zone.xMin+Math.random()*(zone.xMax-zone.xMin);
+  const sz=zone.zMin+Math.random()*(zone.zMax-zone.zMin);
+  g.position.set(sx,0,sz);
+  scene.add(g);
+  pedestrians.push({mesh:g,zone,speed:0.025+Math.random()*0.025,dir:Math.random()>0.5?1:-1,walkOffset:Math.random()*Math.PI*2});
+  return g;
+}
+swZones.forEach(zone=>{for(let i=0;i<6;i++) createPedestrian(zone);});
+
+// CLOUDS
+const clouds=[];
+function createCloud(x,y,z,s){
+  const g=new THREE.Group();g.position.set(x,y,z);g.scale.setScalar(s||1);
+  const cMat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,transparent:true,opacity:0.78});
+  for(let i=0;i<5+Math.floor(Math.random()*5);i++){
+    const p=new THREE.Mesh(new THREE.SphereGeometry(3+Math.random()*3.5,8,6),cMat);
+    p.position.set((Math.random()-0.5)*9,(Math.random()-0.5)*2.5,(Math.random()-0.5)*5);
+    p.scale.y=0.55;g.add(p);
+  }
+  scene.add(g);clouds.push({mesh:g,speed:0.012+Math.random()*0.018});
+}
+for(let i=0;i<18;i++) createCloud((Math.random()-0.5)*400,60+Math.random()*45,(Math.random()-0.5)*250,0.8+Math.random()*1.4);
+
+// STREET LIGHTS along main road sidewalks
+const streetLights=[];
+function createStreetLight(x,z){
+  const g=new THREE.Group();g.position.set(x,0,z);
+  const poleMat=new THREE.MeshStandardMaterial({color:0x444444});
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.18,6.5,8),poleMat);
+  pole.position.y=3.25;g.add(pole);
+  const arm=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.1,2.2),poleMat);
+  arm.position.set(0,6.3,1);g.add(arm);
+  const lampMat=new THREE.MeshStandardMaterial({color:0xffffaa,emissive:0xffffaa,emissiveIntensity:0});
+  const lamp=new THREE.Mesh(new THREE.SphereGeometry(0.28,8,8),lampMat);
+  lamp.position.set(0,6.1,2);g.add(lamp);
+  const sl=new THREE.PointLight(0xffffaa,0,18);
+  sl.position.set(0,5.8,2);g.add(sl);
+  scene.add(g);streetLights.push({mesh:g,lampMat,light:sl});
+}
+for(let i=-80;i<=80;i+=22){createStreetLight(i,13);createStreetLight(i,-13);}
+
+// LIGHTHOUSE
+const lhG=new THREE.Group();lhG.position.set(-90,0,-65);
+lhG.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(4,5,3,16),new THREE.MeshStandardMaterial({color:0x888888})),{position:{set:(x,y,z)=>void(lhG.children[0].position.set(x,y,z)&&true)||true}}));
+const lhBase=new THREE.Mesh(new THREE.CylinderGeometry(4,5,3,16),new THREE.MeshStandardMaterial({color:0x888888}));
+lhBase.position.y=1.5;lhBase.castShadow=true;lhG.add(lhBase);
+const lhTower=new THREE.Mesh(new THREE.CylinderGeometry(2,3.5,22,16),new THREE.MeshStandardMaterial({color:0xffffff}));
+lhTower.position.y=14;lhTower.castShadow=true;lhG.add(lhTower);
+for(let i=0;i<3;i++){const s=new THREE.Mesh(new THREE.CylinderGeometry(2.06,2.06,2.2,16),new THREE.MeshStandardMaterial({color:0xcc0000}));s.position.y=6+i*7;lhG.add(s);}
+const lhLanternMat=new THREE.MeshStandardMaterial({color:0xffffaa,emissive:0xffffaa,emissiveIntensity:1.2,transparent:true,opacity:0.82});
+const lhLantern=new THREE.Mesh(new THREE.CylinderGeometry(2.5,2.2,3,16),lhLanternMat);
+lhLantern.position.y=26.5;lhG.add(lhLantern);
+const lhBeamGeo=new THREE.ConeGeometry(9,65,32,1,true);
+const lhBeam=new THREE.Mesh(lhBeamGeo,new THREE.MeshBasicMaterial({color:0xffffaa,transparent:true,opacity:0.08,side:THREE.DoubleSide}));
+lhBeam.position.set(0,26.5,32);lhBeam.rotation.x=Math.PI/2;lhG.add(lhBeam);
+const lhLight=new THREE.PointLight(0xffffaa,2.5,120);lhLight.position.y=26.5;lhG.add(lhLight);
+scene.add(lhG);
+
+// BRIDGE
+const bridge=new THREE.Mesh(new THREE.BoxGeometry(9,1,65),new THREE.MeshStandardMaterial({color:0x666666}));
+bridge.position.set(48,8,-55);bridge.castShadow=true;scene.add(bridge);
+for(let i=0;i<4;i++){const sup=new THREE.Mesh(new THREE.CylinderGeometry(1,1.5,10,8),new THREE.MeshStandardMaterial({color:0x888888}));sup.position.set(48,3,-75+i*16);scene.add(sup);}
+
+// BOATS
+const boats=[];
+function createBoat(x,z,type){
+  const g=new THREE.Group();g.position.set(x,-0.5,z);
+  if(type==='yacht'){
+    const h=new THREE.Mesh(new THREE.BoxGeometry(4,1.5,10),new THREE.MeshStandardMaterial({color:0xffffff}));
+    h.position.y=0.5;h.castShadow=true;g.add(h);
+    const c=new THREE.Mesh(new THREE.BoxGeometry(2.8,1.5,4),new THREE.MeshStandardMaterial({color:0xeeeeee}));
+    c.position.set(0,2,-1);g.add(c);
+  } else if(type==='fishing'){
+    const h=new THREE.Mesh(new THREE.BoxGeometry(2.2,1.2,5.5),new THREE.MeshStandardMaterial({color:0x8B4513}));
+    h.position.y=0.4;h.castShadow=true;g.add(h);
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,6,8),new THREE.MeshStandardMaterial({color:0x5c4033}));
+    m.position.set(0,3.5,0);g.add(m);
+  } else {
+    const h=new THREE.Mesh(new THREE.BoxGeometry(9,4,22),new THREE.MeshStandardMaterial({color:0xcc0000}));
+    h.position.y=1;h.castShadow=true;g.add(h);
+    const cC=[0xcc0000,0x00aa00,0x0000cc,0xaaaa00];
+    for(let i=0;i<6;i++){const c=new THREE.Mesh(new THREE.BoxGeometry(3.5,2.5,4.5),new THREE.MeshStandardMaterial({color:cC[i%4]}));c.position.set(0,4.5,-6+i*3.5);c.castShadow=true;g.add(c);}
+  }
+  scene.add(g);boats.push({mesh:g,type,speed:0.025+Math.random()*0.025,angle:Math.random()*Math.PI*2});
+  return g;
+}
+createBoat(25,-90,'yacht');createBoat(-12,-100,'fishing');createBoat(55,-130,'cargo');createBoat(-45,-80,'yacht');createBoat(15,-110,'fishing');
+
+// BIRDS
+const birds=[];
+function createBird(){
+  const g=new THREE.Group();
+  const body=new THREE.Mesh(new THREE.ConeGeometry(0.1,0.5,4),new THREE.MeshStandardMaterial({color:0xffffff}));
+  body.rotation.z=Math.PI/2;g.add(body);
+  const wing=new THREE.Mesh(new THREE.PlaneGeometry(0.75,0.18),new THREE.MeshStandardMaterial({color:0xdddddd,side:THREE.DoubleSide}));
+  wing.position.y=0.1;g.add(wing);
+  scene.add(g);
+  birds.push({mesh:g,center:new THREE.Vector3((Math.random()-0.5)*120,30+Math.random()*25,(Math.random()-0.5)*120),radius:12+Math.random()*18,speed:0.004+Math.random()*0.008,angle:Math.random()*Math.PI*2,height:30+Math.random()*20});
+}
+for(let i=0;i<14;i++) createBird();
+
+// RAIN
+const rainGeo=new THREE.BufferGeometry();
+const rainArr=new Float32Array(6000*3);
+for(let i=0;i<6000*3;i+=3){rainArr[i]=(Math.random()-0.5)*350;rainArr[i+1]=Math.random()*220;rainArr[i+2]=(Math.random()-0.5)*350;}
+rainGeo.setAttribute('position',new THREE.BufferAttribute(rainArr,3));
+const rainMat=new THREE.PointsMaterial({color:0x9999bb,size:0.25,transparent:true,opacity:0});
+const rain=new THREE.Points(rainGeo,rainMat);scene.add(rain);
+
+// EVACUATION ROUTES
+const evacuationRoutes=[];
+function createEvacRoute(pts){
+  const geo=new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),60,0.28,8,false);
+  const mat=new THREE.MeshStandardMaterial({color:0x00ff66,emissive:0x00ff66,emissiveIntensity:1,transparent:true,opacity:0});
+  const tube=new THREE.Mesh(geo,mat);scene.add(tube);evacuationRoutes.push(mat);return tube;
+}
+createEvacRoute([new THREE.Vector3(-90,0.5,-65),new THREE.Vector3(-60,0.5,-40),new THREE.Vector3(-30,0.5,-10),new THREE.Vector3(0,0.5,20),new THREE.Vector3(30,0.5,50)]);
+createEvacRoute([new THREE.Vector3(0,0.5,0),new THREE.Vector3(20,0.5,25),new THREE.Vector3(50,0.5,50),new THREE.Vector3(80,0.5,75)]);
+
+// FIRE
+const fireParticles=[],smokeParticles=[];
+function createFireSystem(x,y,z){
+  const fg=new THREE.Group();fg.position.set(x,y,z);
+  for(let i=0;i<25;i++){const fMat=new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(0.04+Math.random()*0.08,1,0.5),transparent:true,opacity:0.8});const f=new THREE.Mesh(new THREE.SphereGeometry(0.3+Math.random()*0.4,6,6),fMat);f.position.set((Math.random()-0.5)*2.5,Math.random()*2,(Math.random()-0.5)*2.5);fg.add(f);fireParticles.push({mesh:f,mat:fMat,baseY:f.position.y,speed:0.02+Math.random()*0.03});}
+  for(let i=0;i<18;i++){const sMat=new THREE.MeshBasicMaterial({color:0x333333,transparent:true,opacity:0.3});const s=new THREE.Mesh(new THREE.SphereGeometry(0.5+Math.random()*0.8,6,6),sMat);s.position.set((Math.random()-0.5)*3.5,2+Math.random()*3,(Math.random()-0.5)*3.5);fg.add(s);smokeParticles.push({mesh:s,mat:sMat,baseY:s.position.y,speed:0.012+Math.random()*0.018});}
+  fg.visible=false;scene.add(fg);return fg;
+}
+const fireSystems=[createFireSystem(15,0,20),createFireSystem(-28,0,38),createFireSystem(45,0,-10)];
+
+// TRAFFIC LIGHTS at intersections
+const trafficLights=[];
+function createTrafficLight(x,z){
+  const g=new THREE.Group();g.position.set(x,0,z);
+  const poleMat=new THREE.MeshStandardMaterial({color:0x333333});
+  const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.1,5.5,8),poleMat);
+  pole.position.y=2.75;g.add(pole);
+  const box=new THREE.Mesh(new THREE.BoxGeometry(0.6,1.6,0.4),new THREE.MeshStandardMaterial({color:0x222222}));
+  box.position.set(0,5.5,0.3);g.add(box);
+  const rMat=new THREE.MeshStandardMaterial({color:0xff0000,emissive:0xff0000,emissiveIntensity:1});
+  const yMat=new THREE.MeshStandardMaterial({color:0xffff00,emissive:0xffff00,emissiveIntensity:0.15});
+  const gMat=new THREE.MeshStandardMaterial({color:0x00ff00,emissive:0x00ff00,emissiveIntensity:0.15});
+  const rL=new THREE.Mesh(new THREE.SphereGeometry(0.14,8,8),rMat);rL.position.set(0,5.85,0.52);g.add(rL);
+  const yL=new THREE.Mesh(new THREE.SphereGeometry(0.14,8,8),yMat);yL.position.set(0,5.5,0.52);g.add(yL);
+  const gL=new THREE.Mesh(new THREE.SphereGeometry(0.14,8,8),gMat);gL.position.set(0,5.15,0.52);g.add(gL);
+  scene.add(g);trafficLights.push({mesh:g,redMat:rMat,yellowMat:yMat,greenMat:gMat,state:0,timer:Math.random()*200});
+}
+[[9,9],[-9,9],[9,-9],[-9,-9],[9,40],[-9,40],[9,-40],[-9,-40],[9,80],[-9,80],[60,9],[-60,9],[60,-9],[-60,-9],[60,40],[-60,40]].forEach(([ix,iz])=>createTrafficLight(ix,iz));
+
+// MINI GLOBE
+const globeContainer=document.getElementById('mini-globe');
+const globeScene=new THREE.Scene(),globeCamera=new THREE.PerspectiveCamera(45,1,0.1,100);
+globeCamera.position.set(0,0,3);
+const globeRenderer=new THREE.WebGLRenderer({alpha:true,antialias:true});
+globeRenderer.setSize(110,110);globeRenderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+globeContainer.appendChild(globeRenderer.domElement);
+const globe=new THREE.Mesh(new THREE.SphereGeometry(1,32,32),new THREE.MeshBasicMaterial({color:0x1a5f7a,wireframe:true,transparent:true,opacity:0.65}));
+globeScene.add(globe);
+const land=new THREE.Mesh(new THREE.SphereGeometry(0.98,32,32),new THREE.MeshBasicMaterial({color:0x4a7c59,wireframe:true,transparent:true,opacity:0.3}));
+globeScene.add(land);
+const cityMarker=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8),new THREE.MeshBasicMaterial({color:0xC8A96B}));
+cityMarker.position.set(0.3,0.5,0.8);globeScene.add(cityMarker);
+globeScene.add(Object.assign(new THREE.DirectionalLight(0xffffff,1.2),{position:{set:()=>{}}}));
+const gL2=new THREE.DirectionalLight(0xffffff,1.2);gL2.position.set(2,2,2);globeScene.add(gL2);
+
+// DAY/NIGHT CYCLE
+function updateDayNightCycle(t){
+  const frac=t/24;
+  const sunAngle=(frac-0.25)*Math.PI*2;
+  sunLight.position.x=Math.cos(sunAngle)*120;
+  sunLight.position.y=Math.sin(sunAngle)*120;
+  sunLight.position.z=60;
+  const isDay=t>6&&t<18;
+  const isSunset=(t>17&&t<19.5)||(t>4.5&&t<7);
+  if(isDay){
+    const di=Math.sin(((t-6)/12)*Math.PI);
+    sunLight.intensity=di*1.7;ambientLight.intensity=0.28+di*0.32;
+    skyMat.color.setHex(isSunset?C.sunsetSky:C.daySky);
+    hemiLight.color.setHex(isSunset?C.sunsetSky:C.daySky);
+    starsMat.opacity=0;moonLight.visible=false;
+    streetLights.forEach(sl=>{sl.lampMat.emissiveIntensity=0;sl.light.intensity=0;});
+    buildingLights.forEach(m=>{m.emissiveIntensity=0.08;});
+  } else {
+    sunLight.intensity=0;ambientLight.intensity=0.08;
+    skyMat.color.setHex(C.nightSky);hemiLight.color.setHex(0x1a1a3e);
+    const np=1-Math.abs(t-12)/12;
+    starsMat.opacity=Math.min(1,np*0.9);moonLight.visible=true;
+    streetLights.forEach(sl=>{sl.lampMat.emissiveIntensity=1.2;sl.light.intensity=1.4;});
+    buildingLights.forEach(m=>{if(Math.random()<0.01) m.emissiveIntensity=0.4+Math.random()*0.4;});
+  }
+  scene.fog.density=THREE.MathUtils.lerp(scene.fog.density,isDay?0.0018:0.004,0.01);
+}
+
+function updateWeather(w){
+  switch(w){
+    case 'sunny':rainMat.opacity=0;scene.fog.density=0.0018;bloomPass.strength=0.35;break;
+    case 'cloudy':rainMat.opacity=0;scene.fog.density=0.004;bloomPass.strength=0.22;break;
+    case 'rain':rainMat.opacity=0.65;scene.fog.density=0.006;bloomPass.strength=0.14;break;
+    case 'storm':rainMat.opacity=0.92;scene.fog.density=0.009;bloomPass.strength=0.1;break;
+    case 'fog':rainMat.opacity=0;scene.fog.density=0.018;bloomPass.strength=0.08;break;
+    case 'wind':rainMat.opacity=0;scene.fog.density=0.0025;bloomPass.strength=0.28;break;
+  }
+}
+
+const cameraModes={
+  orbit:{pos:new THREE.Vector3(90,65,90),target:new THREE.Vector3(0,0,0)},
+  drone:{pos:new THREE.Vector3(0,170,10),target:new THREE.Vector3(0,0,0)},
+  street:{pos:new THREE.Vector3(-35,2.5,3),target:new THREE.Vector3(100,2.5,3)},
+  cinematic:{pos:new THREE.Vector3(150,35,-110),target:new THREE.Vector3(-15,10,20)},
+};
+function setCameraMode(mode){
+  state.cameraMode=mode;
+  const cfg=cameraModes[mode];if(!cfg) return;
+  const sp=camera.position.clone(),st=controls.target.clone();
+  let prog=0;
+  function anim(){prog+=0.02;if(prog>=1){camera.position.copy(cfg.pos);controls.target.copy(cfg.target);return;}
+    const t=1-Math.pow(1-prog,3);
+    camera.position.lerpVectors(sp,cfg.pos,t);controls.target.lerpVectors(st,cfg.target,t);
+    requestAnimationFrame(anim);}
+  anim();
+}
+function playIntro(){
+  camera.position.set(220,160,220);controls.target.set(0,0,0);
+  let prog=0;const ep=new THREE.Vector3(80,60,80),et=new THREE.Vector3(0,5,0);
+  function anim(){prog+=0.005;if(prog>=1){state.introComplete=true;return;}
+    const t=1-Math.pow(1-prog,2);
+    camera.position.lerpVectors(new THREE.Vector3(220,160,220),ep,t);
+    controls.target.lerpVectors(new THREE.Vector3(0,0,0),et,t);requestAnimationFrame(anim);}
+  anim();
+}
+
+// AI PREDICTION
+const AIPrediction={
+  risks:{flood:12,storm:8,traffic:34,heat:5},
+  update(){
+    const{time:t,weather:w}=state;
+    let fr=5;if(w==='rain')fr+=25;if(w==='storm')fr+=48;if(t>18||t<6)fr+=10;if(state.floodLevel>5)fr+=22;
+    let sr=3;if(w==='cloudy')sr+=15;if(w==='rain')sr+=32;if(w==='storm')sr+=58;
+    let tr=20;if(t>7&&t<9)tr+=30;if(t>17&&t<19)tr+=25;if(w==='rain')tr+=15;
+    let hr=2;if(t>11&&t<15)hr+=20;if(w==='sunny')hr+=15;
+    this.risks.flood=Math.min(95,Math.max(0,fr+(Math.random()-0.5)*4));
+    this.risks.storm=Math.min(95,Math.max(0,sr+(Math.random()-0.5)*3));
+    this.risks.traffic=Math.min(95,Math.max(0,tr+(Math.random()-0.5)*5));
+    this.risks.heat=Math.min(95,Math.max(0,hr+(Math.random()-0.5)*2));
+    this.updateUI();this.checkAlerts();
+  },
+  updateUI(){
+    const set=(id,val)=>{
+      const el=document.getElementById(id+'-risk-val'),bar=document.getElementById(id+'-risk-bar');
+      if(!el||!bar) return;
+      el.textContent=Math.round(val)+'%';bar.style.width=val+'%';
+      el.className='risk-value '+(val<30?'risk-low':val<60?'risk-med':'risk-high');
+      bar.className='risk-bar-fill '+(val<30?'fill-low':val<60?'fill-med':'fill-high');
+    };
+    set('flood',this.risks.flood);set('storm',this.risks.storm);set('traffic',this.risks.traffic);set('heat',this.risks.heat);
+    const p24=document.getElementById('pred-24h'),p48=document.getElementById('pred-48h'),p72=document.getElementById('pred-72h');
+    if(this.risks.flood>50){p24.textContent='Flood warning active';p48.textContent='Severe flooding expected';p72.textContent='Critical: Evacuate coastal zones';}
+    else if(this.risks.storm>40){p24.textContent='Storm approaching';p48.textContent='High winds expected';p72.textContent='Storm surge warning';}
+    else{p24.textContent='Low risk period';p48.textContent='Moderate tide expected';p72.textContent='No significant threats';}
+  },
+  checkAlerts(){
+    const b=document.getElementById('alert-banner'),badge=document.getElementById('alert-badge'),txt=document.getElementById('alert-text');
+    if(this.risks.flood>60||this.risks.storm>60){
+      b.classList.add('show');badge.classList.add('active');
+      txt.textContent=this.risks.flood>this.risks.storm?`DISASTER ALERT: Flood risk ${Math.round(this.risks.flood)}%`:`DISASTER ALERT: Storm risk ${Math.round(this.risks.storm)}%`;
+    } else {b.classList.remove('show');badge.classList.remove('active');}
+  }
+};
+
+const Analytics={
+  update(){
+    const t=state.time,w=state.weather;
+    let pop=120000;if(t>7&&t<10)pop+=30000;if(t>11&&t<14)pop+=45000;if(t>17&&t<20)pop+=35000;if(t>22||t<5)pop-=40000;
+    document.getElementById('metric-pop').textContent=Math.floor(pop+(Math.random()-0.5)*2000).toLocaleString();
+    let traffic=5000;if(t>7&&t<9)traffic+=6000;if(t>17&&t<19)traffic+=5500;
+    document.getElementById('metric-traffic').textContent=Math.floor(traffic+(Math.random()-0.5)*500).toLocaleString();
+    let energy=180;if(t>8&&t<18)energy+=80;if(t>18||t<6)energy+=120;
+    document.getElementById('metric-energy').textContent=Math.floor(energy+(Math.random()-0.5)*10)+' MW';
+    let aqi=35;if(w==='fog')aqi+=15;if(w==='storm')aqi-=10;if(state.fireSimulation)aqi+=80;
+    document.getElementById('metric-aqi').textContent='AQI '+Math.floor(aqi+(Math.random()-0.5)*5);
+  }
+};
+
+const AIAssistant={
+  sendMessage(text){
+    const c=document.getElementById('ai-chat-messages');
+    const um=document.createElement('div');um.className='ai-message user';um.textContent=text;c.appendChild(um);c.scrollTop=c.scrollHeight;
+    setTimeout(()=>{const bm=document.createElement('div');bm.className='ai-message bot';bm.textContent=this.respond(text);c.appendChild(bm);c.scrollTop=c.scrollHeight;},500+Math.random()*400);
+  },
+  respond(input){
+    const l=input.toLowerCase();
+    if(l.includes('flood')||l.includes('water')) return `Flood risk: ${Math.round(AIPrediction.risks.flood)}%. ${AIPrediction.risks.flood>50?'Evacuate coastal zones!':'Conditions stable.'}`;
+    if(l.includes('storm')||l.includes('weather')) return `Storm risk: ${Math.round(AIPrediction.risks.storm)}%. ${AIPrediction.risks.storm>40?'Storm developing.':'Weather calm.'}`;
+    if(l.includes('3d')||l.includes('hunyuan')||l.includes('camera')) return 'Click the "OPEN CAMERA to 3D" button! It opens your laptop camera and uses Hunyuan3D-2 on port 9000 to convert 2D photos to 3D models instantly.';
+    if(l.includes('grid')||l.includes('road')) return 'Phase 3 grid layout: vehicles locked to lane Z/X coordinates, buildings only in city blocks, park zone at x=65-125/z=15-85. Zero overlap!';
+    if(l.includes('help')||l.includes('hello')) return 'Phase 3: Grid city, vehicle lanes, park zone, Hunyuan3D-2. Compare old phase 2 localhost vs this new localhost side by side!';
+    return `Phase 3 grid city: ${vehicles.length} vehicles on ${roadLanes.length} lanes, ${buildings.length} buildings in city blocks only. All aligned perfectly!`;
+  }
+};
+
+function updateFloodSimulation(){
+  if(state.floodLevel>0){floodWater.visible=true;floodWater.position.y=state.floodLevel-1.5;floodMat.opacity=Math.min(0.88,0.4+state.floodLevel*0.022);}
+  else floodWater.visible=false;
+}
+
+// UI EVENTS
+document.getElementById('time-slider').addEventListener('input',e=>{state.time=parseFloat(e.target.value);state.autoTime=false;document.getElementById('auto-time-toggle').classList.remove('active');updateTimeDisplay();});
+function updateTimeDisplay(){
+  const h=Math.floor(state.time),m=Math.floor((state.time%1)*60);
+  const ampm=h>=12?'PM':'AM',dh=h%12||12;
+  const ts=dh+':'+m.toString().padStart(2,'0')+' '+ampm;
+  document.getElementById('time-display').textContent=ts;
+  document.getElementById('stat-time').textContent=ts;
+  document.getElementById('current-time-label').textContent=['Midnight','Dawn','Morning','Noon','Afternoon','Sunset','Evening','Night'][Math.min(Math.floor(state.time/3),7)];
+}
+document.querySelectorAll('.weather-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.weather-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+    state.weather=btn.dataset.weather;document.getElementById('stat-weather').textContent=btn.dataset.weather.charAt(0).toUpperCase()+btn.dataset.weather.slice(1);
+    updateWeather(state.weather);
+  });
+});
+document.querySelectorAll('.camera-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{document.querySelectorAll('.camera-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');setCameraMode(btn.dataset.camera);});
+});
+document.getElementById('auto-time-toggle').addEventListener('click',function(){this.classList.toggle('active');state.autoTime=this.classList.contains('active');});
+document.getElementById('traffic-toggle').addEventListener('click',function(){this.classList.toggle('active');state.trafficEnabled=this.classList.contains('active');});
+document.getElementById('pedestrians-toggle').addEventListener('click',function(){this.classList.toggle('active');state.pedestriansEnabled=this.classList.contains('active');});
+document.getElementById('flood-slider').addEventListener('input',e=>{state.floodLevel=parseFloat(e.target.value);document.getElementById('flood-level-label').textContent='Water Level: '+state.floodLevel.toFixed(1)+'m';updateFloodSimulation();});
+document.getElementById('evac-toggle').addEventListener('click',function(){this.classList.toggle('active');state.showEvacuation=this.classList.contains('active');evacuationRoutes.forEach(m=>{m.opacity=state.showEvacuation?0.85:0;});});
+document.getElementById('auto-flood-toggle').addEventListener('click',function(){this.classList.toggle('active');state.autoFlood=this.classList.contains('active');});
+document.getElementById('earthquake-slider').addEventListener('input',e=>{state.earthquakeIntensity=parseFloat(e.target.value);document.getElementById('earthquake-label').textContent='Earthquake: '+state.earthquakeIntensity.toFixed(1)+' Richter';});
+document.getElementById('fire-sim-btn').addEventListener('click',()=>{state.fireSimulation=!state.fireSimulation;document.getElementById('fire-sim-btn').style.background=state.fireSimulation?'rgba(204,51,51,0.32)':'';fireSystems.forEach(s=>s.visible=state.fireSimulation);});
+document.getElementById('quake-sim-btn').addEventListener('click',()=>{state.earthquakeIntensity=7.5;document.getElementById('earthquake-slider').value=7.5;document.getElementById('earthquake-label').textContent='Earthquake: 7.5 Richter';setTimeout(()=>{state.earthquakeIntensity=0;document.getElementById('earthquake-slider').value=0;document.getElementById('earthquake-label').textContent='Earthquake: 0.0 Richter';},5000);});
+document.getElementById('photo-mode-btn').addEventListener('click',()=>{state.photoMode=true;document.getElementById('photo-mode-overlay').classList.add('active');document.getElementById('ui-overlay').style.opacity='0';document.getElementById('ui-overlay').style.pointerEvents='none';});
+document.getElementById('photo-exit').addEventListener('click',()=>{state.photoMode=false;document.getElementById('photo-mode-overlay').classList.remove('active');document.getElementById('ui-overlay').style.opacity='1';document.getElementById('ui-overlay').style.pointerEvents='auto';});
+document.getElementById('photo-capture').addEventListener('click',()=>{renderer.render(scene,camera);const link=document.createElement('a');link.download='coastal-city-phase3-'+Date.now()+'.png';link.href=renderer.domElement.toDataURL('image/png');link.click();});
+document.getElementById('reset-btn').addEventListener('click',()=>{state.time=12;state.weather='sunny';state.floodLevel=0;state.earthquakeIntensity=0;state.fireSimulation=false;state.autoFlood=false;state.showEvacuation=false;document.getElementById('time-slider').value=12;document.getElementById('flood-slider').value=0;document.getElementById('earthquake-slider').value=0;document.querySelectorAll('.weather-btn').forEach(b=>b.classList.remove('active'));document.querySelector('[data-weather="sunny"]').classList.add('active');document.querySelectorAll('.camera-btn').forEach(b=>b.classList.remove('active'));document.querySelector('[data-camera="orbit"]').classList.add('active');setCameraMode('orbit');updateTimeDisplay();updateWeather('sunny');updateFloodSimulation();fireSystems.forEach(s=>s.visible=false);});
+document.getElementById('fullscreen-btn').addEventListener('click',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();});
+document.getElementById('ai-chat-toggle').addEventListener('click',()=>{document.getElementById('ai-chat-widget').classList.toggle('open');document.getElementById('ai-chat-toggle').classList.toggle('hidden');});
+document.getElementById('ai-chat-send').addEventListener('click',()=>{const inp=document.getElementById('ai-chat-input');const txt=inp.value.trim();if(txt){AIAssistant.sendMessage(txt);inp.value='';}});
+document.getElementById('ai-chat-input').addEventListener('keypress',e=>{if(e.key==='Enter')document.getElementById('ai-chat-send').click();});
+document.addEventListener('click',e=>{const w=document.getElementById('ai-chat-widget');const t=document.getElementById('ai-chat-toggle');if(!w.contains(e.target)&&!t.contains(e.target)&&w.classList.contains('open')){w.classList.remove('open');t.classList.remove('hidden');}});
+
+// ============================================================
+// HUNYUAN3D-2 MODAL
+// ============================================================
+let hmStream=null,hmModelUrl=null;
+let hmViewerScene=null,hmViewerRenderer=null,hmViewerCamera=null,hmViewerControls=null,hmAnimId=null;
+
+function initHmViewer(){
+  const c=document.getElementById('hm-3d-viewer');
+  if(hmViewerRenderer){c.innerHTML='';hmViewerRenderer.dispose();}
+  hmViewerScene=new THREE.Scene();hmViewerScene.background=new THREE.Color(0x090912);
+  hmViewerCamera=new THREE.PerspectiveCamera(50,c.clientWidth/c.clientHeight,0.01,1000);
+  hmViewerCamera.position.set(0,1,3);
+  hmViewerRenderer=new THREE.WebGLRenderer({antialias:true});
+  hmViewerRenderer.setSize(c.clientWidth,c.clientHeight);hmViewerRenderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  hmViewerRenderer.shadowMap.enabled=true;hmViewerRenderer.toneMapping=THREE.ACESFilmicToneMapping;
+  c.appendChild(hmViewerRenderer.domElement);
+  hmViewerControls=new OrbitControls(hmViewerCamera,hmViewerRenderer.domElement);
+  hmViewerControls.enableDamping=true;hmViewerControls.autoRotate=true;hmViewerControls.autoRotateSpeed=1.2;
+  const al=new THREE.AmbientLight(0xffffff,0.6);hmViewerScene.add(al);
+  const dl=new THREE.DirectionalLight(0xffffff,1.2);dl.position.set(5,10,5);hmViewerScene.add(dl);
+  const dl2=new THREE.DirectionalLight(0x8FA28A,0.6);dl2.position.set(-5,5,-5);hmViewerScene.add(dl2);
+  const grid=new THREE.GridHelper(4,10,0x333344,0x222233);grid.position.y=-0.5;hmViewerScene.add(grid);
+  function animHm(){hmAnimId=requestAnimationFrame(animHm);hmViewerControls.update();hmViewerRenderer.render(hmViewerScene,hmViewerCamera);}
+  animHm();
+}
+
+function setHmStatus(msg,type){const el=document.getElementById('hm-status');el.textContent=msg;el.className='hm-status'+(type?' '+type:'');}
+function setHmProgress(pct){document.getElementById('hm-progress-fill').style.width=pct+'%';}
+
+function stopHmCamera(){if(hmStream){hmStream.getTracks().forEach(t=>t.stop());hmStream=null;}}
+
+document.getElementById('open-hunyuan-btn').addEventListener('click',()=>{document.getElementById('hunyuan-modal').classList.add('open');initHmViewer();document.getElementById('hm-3d-empty').style.display='flex';});
+document.getElementById('hm-close-btn').addEventListener('click',()=>{document.getElementById('hunyuan-modal').classList.remove('open');stopHmCamera();if(hmAnimId)cancelAnimationFrame(hmAnimId);});
+
+document.getElementById('hm-start-cam').addEventListener('click',async()=>{
+  try{
+    hmStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}});
+    const video=document.getElementById('hm-video');
+    video.srcObject=hmStream;video.style.display='block';
+    document.getElementById('hm-placeholder').style.display='none';
+    document.getElementById('hm-snapshot-canvas').style.display='none';
+    document.getElementById('hm-uploaded-img').style.display='none';
+    document.getElementById('hm-snap-btn').disabled=false;
+    setHmStatus('Camera live! Click "Convert to 3D" to capture and convert.','');
+    document.getElementById('hm-start-cam').textContent='Camera Active';
+  }catch(err){setHmStatus('Camera access denied: '+err.message,'error');}
+});
+
+document.getElementById('hm-upload-btn').addEventListener('click',()=>document.getElementById('hm-file-input').click());
+document.getElementById('hm-file-input').addEventListener('change',e=>{
+  if(e.target.files&&e.target.files[0]){
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      stopHmCamera();
+      const img=document.getElementById('hm-uploaded-img');
+      img.src=ev.target.result;img.style.display='block';
+      document.getElementById('hm-video').style.display='none';
+      document.getElementById('hm-placeholder').style.display='none';
+      document.getElementById('hm-snapshot-canvas').style.display='none';
+      document.getElementById('hm-snap-btn').disabled=false;
+      document.getElementById('hm-start-cam').textContent='Start Camera';
+      setHmStatus('Image loaded — click "Convert to 3D"!','');
+    };
+    reader.readAsDataURL(e.target.files[0]);
+  }
+});
+
+document.getElementById('hm-snap-btn').addEventListener('click',async()=>{
+  const snapBtn=document.getElementById('hm-snap-btn');
+  snapBtn.disabled=true;
+  document.getElementById('hm-download-btn').disabled=true;
+  document.getElementById('hm-place-in-city-btn').disabled=true;
+  setHmStatus('Capturing image...','processing');setHmProgress(10);
+
+  let base64Image='';
+  const video=document.getElementById('hm-video');
+  const canvas=document.getElementById('hm-snapshot-canvas');
+  const img=document.getElementById('hm-uploaded-img');
+
+  if(hmStream&&video.srcObject){
+    canvas.width=video.videoWidth||640;canvas.height=video.videoHeight||480;
+    canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
+    base64Image=canvas.toDataURL('image/jpeg',0.85);
+    stopHmCamera();video.style.display='none';canvas.style.display='block';
+    document.getElementById('hm-start-cam').textContent='Start Camera';
+  } else if(img.style.display!=='none'&&img.src){
+    base64Image=img.src;
+  } else if(canvas.style.display!=='none'){
+    base64Image=canvas.toDataURL('image/jpeg',0.85);
+  }
+
+  if(!base64Image){setHmStatus('No image. Start camera or upload first.','error');snapBtn.disabled=false;setHmProgress(0);return;}
+
+  setHmStatus('Sending to Hunyuan3D-2 on port 9000...','processing');setHmProgress(25);
+
+  try{
+    const resp=await fetch('http://localhost:9000/api/camera-to-3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:base64Image})});
+    setHmProgress(60);
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const data=await resp.json();setHmProgress(80);
+    if(data.model_url||data.glb_url){
+      setHmStatus('Loading 3D model...','processing');hmModelUrl=data.model_url||data.glb_url;
+      await loadGlbInViewer(hmModelUrl);
+      setHmProgress(100);setHmStatus('3D model ready! Drag to rotate. | '+data.processing_time+'s','success');
+      document.getElementById('hm-model-info').textContent='Hunyuan3D-2 output: '+( data.filename||'model.glb')+' | Port 9000';
+    } else {
+      await createDemoModel(data.seed||0.5);setHmProgress(100);
+      setHmStatus('Demo mode (install Hunyuan3D-2 for real conversion)','success');
+      document.getElementById('hm-model-info').textContent='DEMO: Run python backend/main_phase3.py for real Hunyuan3D-2 conversion';
+    }
+  } catch(err){
+    console.warn('Port 9000 not running, demo mode:',err.message);
+    setHmStatus('Port 9000 backend offline. Showing demo 3D model...','processing');setHmProgress(50);
+    await new Promise(r=>setTimeout(r,1000));
+    await createDemoModel(Math.random());setHmProgress(100);
+    setHmStatus('DEMO 3D model ready! Start backend on port 9000 for Hunyuan3D-2.','success');
+    document.getElementById('hm-model-info').textContent='DEMO MODE: Run "uvicorn backend.main_phase3:app --port 9000" for real conversion';
+  }
+  document.getElementById('hm-download-btn').disabled=false;
+  document.getElementById('hm-place-in-city-btn').disabled=false;
+  snapBtn.disabled=false;
+});
+
+async function loadGlbInViewer(url){
+  return new Promise((resolve,reject)=>{
+    const loader=new GLTFLoader();
+    document.getElementById('hm-3d-empty').style.display='none';
+    const toRemove=[];hmViewerScene.traverse(o=>{if(o.isMesh&&!o.isGridHelper)toRemove.push(o);});
+    toRemove.forEach(o=>hmViewerScene.remove(o));
+    loader.load(url,gltf=>{
+      const model=gltf.scene;
+      const box=new THREE.Box3().setFromObject(model);
+      const center=box.getCenter(new THREE.Vector3()),size=box.getSize(new THREE.Vector3()).length();
+      model.position.sub(center);model.scale.setScalar(2/size);
+      hmViewerScene.add(model);
+      hmViewerCamera.position.set(0,0.5,2.5);hmViewerControls.target.set(0,0,0);
+      resolve();
+    },undefined,reject);
+  });
+}
+
+async function createDemoModel(seed){
+  document.getElementById('hm-3d-empty').style.display='none';
+  const toRemove=[];hmViewerScene.traverse(o=>{if(o.isMesh)toRemove.push(o);});toRemove.forEach(o=>hmViewerScene.remove(o));
+  const floors=Math.floor(4+seed*8);const bH=floors*0.42;
+  const body=new THREE.Mesh(new THREE.BoxGeometry(1+seed*0.6,bH,0.8+seed*0.5),new THREE.MeshStandardMaterial({color:0x87CEEB,roughness:0.08,metalness:0.9,transparent:true,opacity:0.75}));
+  body.position.y=bH/2;body.castShadow=true;hmViewerScene.add(body);
+  for(let f=0;f<floors;f++){for(let c=0;c<3;c++){const w=new THREE.Mesh(new THREE.PlaneGeometry(0.18,0.22),new THREE.MeshStandardMaterial({color:0xffffcc,emissive:0xffffcc,emissiveIntensity:0.8}));w.position.set(-0.4+c*0.32,0.3+f*0.44,(0.8+seed*0.5)/2+0.01);hmViewerScene.add(w);}}
+  const roof=new THREE.Mesh(new THREE.BoxGeometry((1+seed*0.6)*0.8,0.08,(0.8+seed*0.5)*0.8),new THREE.MeshStandardMaterial({color:0xC8A96B,metalness:0.6}));roof.position.y=bH+0.04;hmViewerScene.add(roof);
+  const ant=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.5,6),new THREE.MeshStandardMaterial({color:0x888888}));ant.position.y=bH+0.29;hmViewerScene.add(ant);
+  const beacon=new THREE.Mesh(new THREE.SphereGeometry(0.04,8,8),new THREE.MeshStandardMaterial({color:0xff0000,emissive:0xff0000,emissiveIntensity:3}));beacon.position.y=bH+0.56;hmViewerScene.add(beacon);
+  hmViewerCamera.position.set(0,bH/2,3);hmViewerControls.target.set(0,bH/2,0);
+}
+
+document.getElementById('hm-download-btn').addEventListener('click',()=>{
+  if(hmModelUrl){const a=document.createElement('a');a.href=hmModelUrl;a.download='hunyuan3d_output.glb';a.click();}
+  else{hmViewerRenderer.render(hmViewerScene,hmViewerCamera);const a=document.createElement('a');a.href=hmViewerRenderer.domElement.toDataURL('image/png');a.download='hunyuan3d_preview.png';a.click();}
+});
+
+document.getElementById('hm-place-in-city-btn').addEventListener('click',()=>{
+  if(hmViewerScene){
+    hmViewerScene.traverse(o=>{
+      if(o.isMesh){
+        const clone=o.clone();
+        clone.position.set((Math.random()-0.5)*40,0,20+Math.random()*30);
+        clone.scale.setScalar(8+Math.random()*10);
+        scene.add(clone);
+      }
+    });
+    document.getElementById('hunyuan-modal').classList.remove('open');
+    stopHmCamera();if(hmAnimId)cancelAnimationFrame(hmAnimId);
+  }
+});
+
+// LOADING
+const loadSteps=['Initializing grid-based city layout...','Building road network (N-S + E-W grid)...','Placing buildings in city blocks only...','Adding park zone with fountain, ferris wheel...','Spawning vehicles on road lanes (no building overlap)...','Adding pedestrians to sidewalks only...','Configuring Hunyuan3D-2 pipeline on port 9000...','Loading AI prediction models...','Setting up lighting & weather systems...','Phase 3 — Perfect City Ready!'];
+let lp=0;
+const lb=document.getElementById('loading-bar'),lt=document.getElementById('loading-text');
+function updateLoading(){
+  lp+=1.2;lb.style.width=Math.min(lp,100)+'%';
+  lt.textContent=loadSteps[Math.min(Math.floor((lp/100)*loadSteps.length),loadSteps.length-1)];
+  if(lp<100){setTimeout(updateLoading,55);}
+  else{setTimeout(()=>{document.getElementById('loading-screen').classList.add('fade-out');document.getElementById('ui-overlay').style.opacity='1';playIntro();},600);}
+}
+updateLoading();
+
+// ANIMATION LOOP
+const clock=new THREE.Clock();
+let aiTimer=0,analyticsTimer=0;
+
+function animate(){
+  requestAnimationFrame(animate);
+  const delta=clock.getDelta(),elapsed=clock.getElapsedTime();
+
+  state.frameCount++;
+  const now=performance.now();
+  if(now-state.lastFpsTime>=1000){state.fps=state.frameCount;state.frameCount=0;state.lastFpsTime=now;document.getElementById('fps-counter').textContent=state.fps+' FPS';}
+
+  if(state.autoTime){state.time+=delta*0.1;if(state.time>=24)state.time=0;document.getElementById('time-slider').value=state.time;updateTimeDisplay();}
+  updateDayNightCycle(state.time);
+
+  if(state.autoFlood){const target=state.weather==='storm'?12:state.weather==='rain'?6:2;state.floodLevel=THREE.MathUtils.lerp(state.floodLevel,target,delta*0.1);document.getElementById('flood-slider').value=state.floodLevel;document.getElementById('flood-level-label').textContent='Water Level: '+state.floodLevel.toFixed(1)+'m';updateFloodSimulation();}
+
+  aiTimer+=delta;if(aiTimer>2){aiTimer=0;AIPrediction.update();}
+  analyticsTimer+=delta;if(analyticsTimer>1){analyticsTimer=0;Analytics.update();}
+
+  // Ocean waves
+  const op=ocean.geometry.attributes.position;
+  for(let i=0;i<op.count;i++){const x=oceanOrigPos.getX(i),y=oceanOrigPos.getY(i);op.setZ(i,Math.sin(x*0.1+elapsed*1.4)*0.5+Math.sin(y*0.14+elapsed*1.1)*0.3+Math.sin((x+y)*0.07+elapsed*0.75)*0.18);}
+  op.needsUpdate=true;ocean.geometry.computeVertexNormals();
+
+  if(floodWater.visible){
+    const fp=floodWater.geometry.attributes.position;
+    for(let i=0;i<fp.count;i++){const x=fp.getX(i),y=fp.getY(i);fp.setZ(i,Math.sin(x*0.04+elapsed)*0.15+Math.sin(y*0.03+elapsed*0.6)*0.12);}
+    fp.needsUpdate=true;
+  }
+
+  boats.forEach(b=>{b.mesh.position.x+=Math.sin(elapsed*b.speed+b.angle)*0.018;b.mesh.position.y=Math.sin(elapsed*0.45+b.angle)*0.28-0.5;b.mesh.rotation.z=Math.sin(elapsed*0.28+b.angle)*0.04;});
+
+  // VEHICLES — position locked to lane coordinates
+  if(state.trafficEnabled){
+    vehicles.forEach(v=>{
+      const lane=v.lane;
+      if(lane.type==='EW'){
+        v.mesh.position.x+=v.speed*v.direction;
+        v.mesh.position.z=lane.z;v.mesh.position.y=0;
+        if(v.mesh.position.x>145)v.mesh.position.x=-145;
+        if(v.mesh.position.x<-145)v.mesh.position.x=145;
+      } else {
+        v.mesh.position.z+=v.speed*v.direction;
+        v.mesh.position.x=lane.x;v.mesh.position.y=0;
+        if(v.mesh.position.z>115)v.mesh.position.z=-115;
+        if(v.mesh.position.z<-115)v.mesh.position.z=115;
+      }
+    });
+  }
+
+  // PEDESTRIANS — clamped to sidewalk zones
+  if(state.pedestriansEnabled){
+    pedestrians.forEach(ped=>{
+      const z=ped.zone;
+      if(z.axis==='x'){
+        ped.mesh.position.x+=ped.dir*ped.speed;
+        if(ped.mesh.position.x>z.xMax){ped.mesh.position.x=z.xMax;ped.dir=-1;}
+        if(ped.mesh.position.x<z.xMin){ped.mesh.position.x=z.xMin;ped.dir=1;}
+      } else {
+        ped.mesh.position.z+=ped.dir*ped.speed;
+        if(ped.mesh.position.z>z.zMax){ped.mesh.position.z=z.zMax;ped.dir=-1;}
+        if(ped.mesh.position.z<z.zMin){ped.mesh.position.z=z.zMin;ped.dir=1;}
+      }
+      ped.mesh.position.y=Math.abs(Math.sin(elapsed*5+ped.walkOffset))*0.08;
+    });
+  }
+
+  clouds.forEach(c=>{c.mesh.position.x+=c.speed;if(c.mesh.position.x>250)c.mesh.position.x=-250;});
+  trees.forEach(t=>{const ws=(state.weather==='wind'||state.weather==='storm')?0.12:0.025;t.mesh.rotation.z=Math.sin(elapsed*1.4+t.mesh.position.x*0.1)*ws;t.mesh.rotation.x=Math.sin(elapsed*1.1+t.mesh.position.z*0.1)*ws*0.5;});
+  lhG.rotation.y+=0.008;lhBeam.rotation.y+=0.008;
+
+  birds.forEach(b=>{b.angle+=b.speed;b.mesh.position.x=b.center.x+Math.cos(b.angle)*b.radius;b.mesh.position.z=b.center.z+Math.sin(b.angle)*b.radius;b.mesh.position.y=b.height+Math.sin(elapsed*2+b.angle)*1.8;b.mesh.rotation.y=-b.angle+Math.PI/2;if(b.mesh.children[1])b.mesh.children[1].rotation.x=Math.sin(elapsed*10)*0.4;});
+
+  fountainParticles.forEach(p=>{p.mesh.position.add(p.vel);p.vel.y-=0.004;p.life--;if(p.life<=0||p.mesh.position.y<p.base.y+0.3){p.mesh.position.set(p.base.x+(Math.random()-0.5)*0.5,p.base.y+2.5,p.base.z+(Math.random()-0.5)*0.5);p.vel.set((Math.random()-0.5)*0.18,0.12+Math.random()*0.16,(Math.random()-0.5)*0.18);p.life=50+Math.random()*40;}});
+
+  // Ferris wheel cabins — orbit around wheel center (15 = wheel y)
+  const nc=12,si=ferrisGroup.children.length-nc;
+  for(let i=0;i<nc;i++){const ch=ferrisGroup.children[si+i];if(ch&&ch.isMesh){const ang=elapsed*0.12+(i/nc)*Math.PI*2;ch.position.set(Math.cos(ang)*10,15+Math.sin(ang)*10,0);ch.rotation.z=-ang;}}
+
+  trafficLights.forEach(tl=>{tl.timer++;if(tl.timer>250){tl.timer=0;tl.state=(tl.state+1)%3;}tl.redMat.emissiveIntensity=tl.state===0?1.2:0.08;tl.yellowMat.emissiveIntensity=tl.state===1?1.2:0.08;tl.greenMat.emissiveIntensity=tl.state===2?1.2:0.08;});
+
+  if(state.weather==='rain'||state.weather==='storm'){const rp=rain.geometry.attributes.position;for(let i=0;i<6000*3;i+=3){rp.array[i+1]-=(state.weather==='storm'?3:2);if(rp.array[i+1]<0)rp.array[i+1]=120+Math.random()*80;}rp.needsUpdate=true;}
+  if(state.weather==='storm'&&Math.random()<0.008){sunLight.intensity=4;setTimeout(()=>{sunLight.intensity=0;},80);}
+
+  if(state.earthquakeIntensity>0){
+    const sh=state.earthquakeIntensity*0.018;
+    camera.position.x+=(Math.random()-0.5)*sh;camera.position.y+=(Math.random()-0.5)*sh*0.5;camera.position.z+=(Math.random()-0.5)*sh;
+    buildings.forEach((b,i)=>{const sw=state.earthquakeIntensity*0.004;b.rotation.z=Math.sin(elapsed*3+i)*sw;b.rotation.x=Math.cos(elapsed*2.5+i)*sw*0.5;});
+  } else {buildings.forEach(b=>{b.rotation.z=THREE.MathUtils.lerp(b.rotation.z,0,0.1);b.rotation.x=THREE.MathUtils.lerp(b.rotation.x,0,0.1);});}
+
+  if(state.fireSimulation){fireParticles.forEach(p=>{p.mesh.position.y+=p.speed;p.mesh.scale.setScalar(1+Math.sin(elapsed*5)*0.28);p.mat.opacity=0.55+Math.sin(elapsed*8)*0.25;if(p.mesh.position.y>p.baseY+2.8)p.mesh.position.y=p.baseY;});smokeParticles.forEach(p=>{p.mesh.position.y+=p.speed;p.mesh.position.x+=Math.sin(elapsed+p.mesh.position.y)*0.008;p.mat.opacity=Math.max(0,0.38-(p.mesh.position.y-p.baseY)*0.05);if(p.mesh.position.y>p.baseY+8){p.mesh.position.y=p.baseY;p.mat.opacity=0.38;}});}
+  if(state.showEvacuation){evacuationRoutes.forEach(m=>{m.emissiveIntensity=0.5+Math.sin(elapsed*3)*0.5;});}
+
+  globe.rotation.y+=0.002;land.rotation.y+=0.002;globeRenderer.render(globeScene,globeCamera);
+  controls.update();composer.render();
+}
+
+window.addEventListener('resize',()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);composer.setSize(window.innerWidth,window.innerHeight);
+  bloomPass.resolution.set(window.innerWidth,window.innerHeight);
+});
+
+document.getElementById('stat-objects').textContent=scene.children.length+buildings.length+vehicles.length+pedestrians.length+trees.length;
+
+// Create Floating Camera Button
+const floatingCamBtn = document.createElement('button');
+floatingCamBtn.id = 'floating-cam-btn';
+floatingCamBtn.style.cssText = 'position:fixed; bottom:90px; right:20px; width:60px; height:60px; border-radius:50%; background:linear-gradient(135deg,#C8A96B,#8FA28A); border:none; box-shadow:0 4px 20px rgba(200,169,107,0.4); cursor:pointer; z-index:400; display:flex; align-items:center; justify-content:center; color:#060610; transition: transform 0.3s;';
+floatingCamBtn.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg>';
+floatingCamBtn.onmouseover = () => floatingCamBtn.style.transform = 'scale(1.1)';
+floatingCamBtn.onmouseout = () => floatingCamBtn.style.transform = 'scale(1)';
+document.body.appendChild(floatingCamBtn);
+
+floatingCamBtn.addEventListener('click', () => {
+    document.getElementById('hunyuan-modal').classList.add('open');
+});
+
+animate();
+</script>
+</body>
+</html>

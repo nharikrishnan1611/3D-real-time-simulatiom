@@ -1,0 +1,2833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coastal City Digital Twin | Phase 2</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;overflow:hidden;background:#0a0a0f;color:#F7F4ED}
+#canvas-container{width:100vw;height:100vh;position:fixed;top:0;left:0}
+canvas{display:block}
+
+/* Loading Screen */
+#loading-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:#0a0a0f;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;transition:opacity 1.5s ease}
+#loading-screen.fade-out{opacity:0;pointer-events:none}
+.loading-title{font-size:2.5rem;font-weight:300;color:#F7F4ED;letter-spacing:0.15em;margin-bottom:8px}
+.loading-subtitle{font-size:0.85rem;color:#8FA28A;letter-spacing:0.3em;text-transform:uppercase;margin-bottom:40px}
+.loading-bar-container{width:300px;height:2px;background:rgba(143,162,138,0.15);border-radius:2px;overflow:hidden}
+.loading-bar{width:0%;height:100%;background:#8FA28A;transition:width 0.3s ease}
+.loading-text{margin-top:20px;font-size:0.75rem;color:rgba(247,244,237,0.4);letter-spacing:0.1em}
+
+/* UI Overlay */
+.ui-overlay{position:fixed;pointer-events:none;z-index:100;top:0;left:0;width:100%;height:100%}
+.ui-overlay>*{pointer-events:auto}
+
+/* Top Bar */
+.top-bar{position:absolute;top:20px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:10px 24px;background:rgba(10,10,15,0.6);backdrop-filter:blur(20px);border:1px solid rgba(143,162,138,0.12);border-radius:16px}
+.top-bar .logo{font-size:0.85rem;font-weight:600;color:#F7F4ED;letter-spacing:0.08em}
+.top-bar .divider{width:1px;height:16px;background:rgba(143,162,138,0.3)}
+.top-bar .time-display{font-size:0.8rem;color:#C7D3C0;font-variant-numeric:tabular-nums}
+.top-bar .fps-counter{font-size:0.7rem;color:#8FA28A;font-variant-numeric:tabular-nums;min-width:45px;text-align:right}
+.top-bar .alert-badge{padding:2px 8px;background:rgba(204,51,51,0.2);border:1px solid rgba(204,51,51,0.4);border-radius:6px;color:#ff6666;font-size:0.65rem;font-weight:600;letter-spacing:0.05em;display:none}
+.top-bar .alert-badge.active{display:block}
+
+/* Sidebar */
+.sidebar{position:absolute;top:80px;left:20px;width:300px;max-height:calc(100vh - 100px);overflow-y:auto;background:rgba(10,10,15,0.55);backdrop-filter:blur(24px);border:1px solid rgba(143,162,138,0.1);border-radius:20px;padding:20px}
+.sidebar::-webkit-scrollbar{width:4px}
+.sidebar::-webkit-scrollbar-track{background:transparent}
+.sidebar::-webkit-scrollbar-thumb{background:rgba(143,162,138,0.3);border-radius:2px}
+
+.panel-section{margin-bottom:20px}
+.panel-section:last-child{margin-bottom:0}
+.panel-title{font-size:0.7rem;font-weight:600;color:#8FA28A;letter-spacing:0.15em;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.panel-title::before{content:'';width:8px;height:8px;border-radius:50%;background:#8FA28A;opacity:0.5}
+.panel-title.phase2::before{background:#C8A96B}
+.panel-title.phase2{color:#C8A96B}
+
+/* Sliders */
+.time-slider-container{position:relative;padding:10px 0}
+.time-slider,.flood-slider,.disaster-slider{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:rgba(143,162,138,0.2);outline:none;cursor:pointer}
+.time-slider::-webkit-slider-thumb,.flood-slider::-webkit-slider-thumb,.disaster-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#C8A96B;cursor:pointer;border:2px solid #F7F4ED;box-shadow:0 0 10px rgba(200,169,107,0.3)}
+.flood-slider::-webkit-slider-thumb{background:#4488cc}
+.disaster-slider::-webkit-slider-thumb{background:#cc4444}
+.time-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:0.65rem;color:rgba(247,244,237,0.4)}
+.current-time-label{text-align:center;font-size:0.8rem;color:#C8A96B;margin-top:8px;font-weight:500}
+.slider-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:0.6rem;color:rgba(247,244,237,0.4)}
+
+/* Weather Grid */
+.weather-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.weather-btn{padding:10px 6px;border:1px solid rgba(143,162,138,0.15);border-radius:12px;background:rgba(143,162,138,0.05);color:rgba(247,244,237,0.6);font-size:0.7rem;cursor:pointer;transition:all 0.3s ease;display:flex;flex-direction:column;align-items:center;gap:4px}
+.weather-btn:hover{background:rgba(143,162,138,0.12);border-color:rgba(143,162,138,0.3);color:#F7F4ED}
+.weather-btn.active{background:rgba(200,169,107,0.15);border-color:rgba(200,169,107,0.4);color:#C8A96B}
+.weather-btn svg{width:20px;height:20px}
+
+/* Camera Grid */
+.camera-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.camera-btn{padding:10px 8px;border:1px solid rgba(143,162,138,0.15);border-radius:12px;background:rgba(143,162,138,0.05);color:rgba(247,244,237,0.6);font-size:0.7rem;cursor:pointer;transition:all 0.3s ease;text-align:center}
+.camera-btn:hover{background:rgba(143,162,138,0.12);border-color:rgba(143,162,138,0.3);color:#F7F4ED}
+.camera-btn.active{background:rgba(200,169,107,0.15);border-color:rgba(200,169,107,0.4);color:#C8A96B}
+
+/* Toggles */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(143,162,138,0.08)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-label{font-size:0.75rem;color:rgba(247,244,237,0.7)}
+.toggle-switch{position:relative;width:40px;height:22px;background:rgba(143,162,138,0.15);border-radius:11px;cursor:pointer;transition:background 0.3s ease}
+.toggle-switch.active{background:#8FA28A}
+.toggle-switch.phase2.active{background:#C8A96B}
+.toggle-switch::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#F7F4ED;transition:transform 0.3s ease;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
+.toggle-switch.active::after{transform:translateX(18px)}
+
+/* Quality Slider */
+.quality-slider{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:rgba(143,162,138,0.2);outline:none;cursor:pointer;margin-top:8px}
+.quality-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:#8FA28A;cursor:pointer;border:2px solid #F7F4ED}
+.quality-labels{display:flex;justify-content:space-between;margin-top:6px;font-size:0.6rem;color:rgba(247,244,237,0.4)}
+
+/* Action Buttons */
+.action-btn{width:100%;padding:12px;border:1px solid rgba(143,162,138,0.2);border-radius:12px;background:rgba(143,162,138,0.08);color:#F7F4ED;font-size:0.75rem;font-weight:500;cursor:pointer;transition:all 0.3s ease;display:flex;align-items:center;justify-content:center;gap:8px}
+.action-btn:hover{background:rgba(143,162,138,0.15);border-color:rgba(143,162,138,0.35)}
+.action-btn.primary{background:rgba(200,169,107,0.15);border-color:rgba(200,169,107,0.3);color:#C8A96B}
+.action-btn.primary:hover{background:rgba(200,169,107,0.25)}
+.action-btn.danger{background:rgba(204,51,51,0.15);border-color:rgba(204,51,51,0.3);color:#ff6666}
+.action-btn.danger:hover{background:rgba(204,51,51,0.25)}
+
+/* AI Prediction Panel */
+.prediction-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+.prediction-card{padding:10px;border-radius:10px;background:rgba(143,162,138,0.05);border:1px solid rgba(143,162,138,0.1);text-align:center}
+.prediction-card .risk-label{font-size:0.6rem;color:rgba(247,244,237,0.5);text-transform:uppercase;letter-spacing:0.1em}
+.prediction-card .risk-value{font-size:1.2rem;font-weight:700;margin-top:4px}
+.prediction-card .risk-bar{height:3px;border-radius:2px;margin-top:6px;background:rgba(143,162,138,0.15);overflow:hidden}
+.prediction-card .risk-bar-fill{height:100%;border-radius:2px;transition:width 0.5s ease}
+.risk-low{color:#4caf50}
+.risk-med{color:#ff9800}
+.risk-high{color:#f44336}
+.fill-low{background:#4caf50}
+.fill-med{background:#ff9800}
+.fill-high{background:#f44336}
+
+.prediction-timeline{margin-top:12px;padding:10px;border-radius:10px;background:rgba(10,10,15,0.4);border:1px solid rgba(143,162,138,0.08)}
+.timeline-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:0.7rem}
+.timeline-row:last-child{margin-bottom:0}
+.timeline-dot{width:8px;height:8px;border-radius:50%;background:#8FA28A}
+.timeline-dot.alert{background:#f44336}
+.timeline-label{color:rgba(247,244,237,0.6);min-width:40px}
+.timeline-value{color:#F7F4ED;font-weight:500}
+
+/* Analytics */
+.analytics-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+.analytics-card{padding:10px;border-radius:10px;background:rgba(10,10,15,0.4);border:1px solid rgba(143,162,138,0.08)}
+.analytics-card .metric-label{font-size:0.6rem;color:rgba(247,244,237,0.5);text-transform:uppercase;letter-spacing:0.1em}
+.analytics-card .metric-value{font-size:1rem;font-weight:700;color:#C8A96B;margin-top:4px}
+.analytics-card .metric-bar{height:3px;border-radius:2px;margin-top:6px;background:rgba(143,162,138,0.15);overflow:hidden}
+.analytics-card .metric-bar-fill{height:100%;border-radius:2px;background:#8FA28A;transition:width 0.5s ease}
+
+/* Bottom Stats */
+.bottom-stats{position:absolute;bottom:20px;right:20px;display:flex;gap:12px}
+.stat-pill{padding:8px 16px;background:rgba(10,10,15,0.6);backdrop-filter:blur(20px);border:1px solid rgba(143,162,138,0.1);border-radius:12px;font-size:0.7rem;color:rgba(247,244,237,0.6);display:flex;align-items:center;gap:6px}
+.stat-pill .value{color:#C8A96B;font-weight:600}
+
+/* Photo Mode */
+.photo-mode-overlay{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:200;opacity:0;transition:opacity 0.5s ease}
+.photo-mode-overlay.active{opacity:1}
+.photo-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:80%;border:2px solid rgba(200,169,107,0.3);border-radius:4px}
+.photo-frame::before,.photo-frame::after{content:'';position:absolute;width:20px;height:20px;border:2px solid #C8A96B}
+.photo-frame::before{top:-2px;left:-2px;border-right:none;border-bottom:none}
+.photo-frame::after{bottom:-2px;right:-2px;border-left:none;border-top:none}
+.photo-controls{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);display:flex;gap:12px}
+.photo-btn{padding:10px 20px;background:rgba(10,10,15,0.8);backdrop-filter:blur(20px);border:1px solid rgba(200,169,107,0.3);border-radius:12px;color:#C8A96B;font-size:0.75rem;cursor:pointer;transition:all 0.3s ease}
+.photo-btn:hover{background:rgba(200,169,107,0.2)}
+
+/* AI Assistant Chat */
+.ai-chat-widget{position:fixed;bottom:20px;left:20px;width:320px;background:rgba(10,10,15,0.85);backdrop-filter:blur(24px);border:1px solid rgba(143,162,138,0.15);border-radius:16px;overflow:hidden;z-index:150;transform:translateY(calc(100% + 20px));transition:transform 0.4s cubic-bezier(0.16,1,0.3,1)}
+.ai-chat-widget.open{transform:translateY(0)}
+.ai-chat-header{padding:14px 16px;background:rgba(200,169,107,0.1);border-bottom:1px solid rgba(143,162,138,0.1);display:flex;align-items:center;gap:10px}
+.ai-chat-header .ai-avatar{width:28px;height:28px;border-radius:50%;background:#C8A96B;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;color:#0a0a0f}
+.ai-chat-header .ai-title{font-size:0.8rem;font-weight:600;color:#F7F4ED}
+.ai-chat-header .ai-status{font-size:0.65rem;color:#8FA28A;margin-left:auto}
+.ai-chat-messages{padding:12px;max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+.ai-message{padding:10px 12px;border-radius:12px;font-size:0.75rem;line-height:1.5;max-width:85%}
+.ai-message.user{align-self:flex-end;background:rgba(200,169,107,0.15);color:#F7F4ED;border-bottom-right-radius:4px}
+.ai-message.bot{align-self:flex-start;background:rgba(143,162,138,0.1);color:#C7D3C0;border-bottom-left-radius:4px}
+.ai-chat-input{padding:10px 12px;border-top:1px solid rgba(143,162,138,0.1);display:flex;gap:8px}
+.ai-chat-input input{flex:1;background:rgba(143,162,138,0.08);border:1px solid rgba(143,162,138,0.15);border-radius:10px;padding:8px 12px;color:#F7F4ED;font-size:0.75rem;outline:none}
+.ai-chat-input input::placeholder{color:rgba(247,244,237,0.3)}
+.ai-chat-input button{padding:8px 14px;background:#C8A96B;border:none;border-radius:10px;color:#0a0a0f;font-size:0.7rem;font-weight:600;cursor:pointer;transition:opacity 0.2s}
+.ai-chat-input button:hover{opacity:0.8}
+.ai-chat-toggle{position:fixed;bottom:20px;left:20px;width:50px;height:50px;border-radius:50%;background:#C8A96B;border:none;color:#0a0a0f;font-size:1.2rem;cursor:pointer;z-index:151;box-shadow:0 4px 20px rgba(200,169,107,0.3);transition:transform 0.3s,opacity 0.3s;display:flex;align-items:center;justify-content:center}
+.ai-chat-toggle:hover{transform:scale(1.1)}
+.ai-chat-toggle.hidden{opacity:0;pointer-events:none}
+
+/* Mini Globe */
+.mini-globe{position:fixed;top:80px;right:20px;width:120px;height:120px;border-radius:50%;overflow:hidden;border:2px solid rgba(143,162,138,0.2);background:rgba(10,10,15,0.6);backdrop-filter:blur(10px);z-index:100}
+.mini-globe canvas{width:100%!important;height:100%!important}
+
+/* Alert Banner */
+.alert-banner{position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-100%);padding:10px 24px;background:rgba(204,51,51,0.9);backdrop-filter:blur(10px);border-radius:12px;font-size:0.8rem;font-weight:600;color:#fff;z-index:250;transition:transform 0.4s cubic-bezier(0.16,1,0.3,1);display:flex;align-items:center;gap:10px}
+.alert-banner.show{transform:translateX(-50%) translateY(0)}
+.alert-banner .alert-icon{width:20px;height:20px}
+
+/* Disaster Overlay */
+.disaster-overlay{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:50;opacity:0;transition:opacity 0.5s ease}
+.disaster-overlay.active{opacity:1}
+
+/* Animations */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.animate-in{animation:fadeInUp 0.8s ease forwards}
+.delay-1{animation-delay:0.1s;opacity:0}
+.delay-2{animation-delay:0.2s;opacity:0}
+.delay-3{animation-delay:0.3s;opacity:0}
+
+/* Responsive */
+@media(max-width:768px){.sidebar{width:260px;left:10px;top:70px}.top-bar{padding:8px 16px}.loading-title{font-size:1.8rem}.ai-chat-widget{width:calc(100vw - 40px);left:20px}.mini-globe{width:80px;height:80px;top:70px}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loading-screen">
+<div class="loading-title">Coastal City</div>
+<div class="loading-subtitle">Digital Twin — Phase 2</div>
+<div class="loading-bar-container"><div class="loading-bar" id="loading-bar"></div></div>
+<div class="loading-text" id="loading-text">Initializing AI modules...</div>
+</div>
+
+<!-- Canvas -->
+<div id="canvas-container"></div>
+
+<!-- Mini Globe -->
+<div class="mini-globe" id="mini-globe"></div>
+
+<!-- Alert Banner -->
+<div class="alert-banner" id="alert-banner">
+<svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+<span id="alert-text">Disaster Alert: Flood risk detected</span>
+</div>
+
+<!-- UI Overlay -->
+<div class="ui-overlay" id="ui-overlay" style="opacity:0;transition:opacity 1s ease;">
+<!-- Top Bar -->
+<div class="top-bar animate-in delay-1">
+<div class="logo">COASTAL CITY</div>
+<div class="divider"></div>
+<div class="time-display" id="time-display">12:00 PM</div>
+<div class="divider"></div>
+<div class="fps-counter" id="fps-counter">60 FPS</div>
+<div class="alert-badge" id="alert-badge">LIVE</div>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar animate-in delay-2">
+<!-- Phase 1: Time of Day -->
+<div class="panel-section">
+<div class="panel-title">Time of Day</div>
+<div class="time-slider-container">
+<input type="range" class="time-slider" id="time-slider" min="0" max="24" step="0.1" value="12">
+<div class="time-labels"><span>12AM</span><span>6AM</span><span>12PM</span><span>6PM</span><span>12AM</span></div>
+<div class="current-time-label" id="current-time-label">Noon</div>
+</div>
+</div>
+
+<!-- Phase 1: Weather -->
+<div class="panel-section">
+<div class="panel-title">Weather</div>
+<div class="weather-grid">
+<button class="weather-btn active" data-weather="sunny"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>Sunny</button>
+<button class="weather-btn" data-weather="cloudy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>Cloudy</button>
+<button class="weather-btn" data-weather="rain"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 16.2A4.5 4.5 0 0 0 3.2 14.2C1.4 12.4 0 10 0 7a5 5 0 0 1 9-3 7 7 0 0 1 13 4c0 2-1 4-2 8.2z"/><path d="M8 18v2m4-2v2m4-2v2"/></svg>Rain</button>
+<button class="weather-btn" data-weather="storm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Storm</button>
+<button class="weather-btn" data-weather="fog"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 14h16M4 18h16M4 10h16M4 6h16"/></svg>Fog</button>
+<button class="weather-btn" data-weather="wind"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2"/></svg>Wind</button>
+</div>
+</div>
+
+<!-- Phase 1: Camera -->
+<div class="panel-section">
+<div class="panel-title">Camera Mode</div>
+<div class="camera-grid">
+<button class="camera-btn active" data-camera="orbit">Orbit</button>
+<button class="camera-btn" data-camera="drone">Drone</button>
+<button class="camera-btn" data-camera="street">Street</button>
+<button class="camera-btn" data-camera="cinematic">Cinematic</button>
+</div>
+</div>
+
+<!-- Phase 1: Environment -->
+<div class="panel-section">
+<div class="panel-title">Environment</div>
+<div class="toggle-row"><span class="toggle-label">Auto Day/Night</span><div class="toggle-switch active" id="auto-time-toggle"></div></div>
+<div class="toggle-row"><span class="toggle-label">Traffic</span><div class="toggle-switch active" id="traffic-toggle"></div></div>
+<div class="toggle-row"><span class="toggle-label">Pedestrians</span><div class="toggle-switch active" id="pedestrians-toggle"></div></div>
+<div class="toggle-row"><span class="toggle-label">Sound Effects</span><div class="toggle-switch" id="sound-toggle"></div></div>
+</div>
+
+<!-- Phase 2: 2D to 3D Digital Twin -->
+<div class="panel-section">
+<div class="panel-title phase2">Digital Twin Generator</div>
+<button class="action-btn primary" id="create-twin-btn" style="background:rgba(200,169,107,0.25);border-color:#C8A96B;font-weight:700;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>CREATE DIGITAL TWIN</button>
+<div style="margin-top:8px; display:flex; gap:8px;">
+    <button class="action-btn" id="ai-vision-toggle" style="flex:1;font-size:0.65rem;padding:6px">AI Vision</button>
+    <button class="action-btn" id="depth-map-toggle" style="flex:1;font-size:0.65rem;padding:6px">Depth Map</button>
+</div>
+<div class="toggle-row" style="margin-top:8px"><span class="toggle-label">Auto Predict Floods</span><div class="toggle-switch phase2" id="auto-predict-toggle"></div></div>
+</div>
+
+<!-- Phase 2: AI Disaster Prediction -->
+<div class="panel-section">
+<div class="panel-title phase2">AI Disaster Prediction</div>
+<div class="prediction-grid">
+<div class="prediction-card">
+<div class="risk-label">Flood Risk</div>
+<div class="risk-value risk-low" id="flood-risk-val">12%</div>
+<div class="risk-bar"><div class="risk-bar-fill fill-low" id="flood-risk-bar" style="width:12%"></div></div>
+</div>
+<div class="prediction-card">
+<div class="risk-label">Storm Risk</div>
+<div class="risk-value risk-low" id="storm-risk-val">8%</div>
+<div class="risk-bar"><div class="risk-bar-fill fill-low" id="storm-risk-bar" style="width:8%"></div></div>
+</div>
+<div class="prediction-card">
+<div class="risk-label">Traffic Risk</div>
+<div class="risk-value risk-med" id="traffic-risk-val">34%</div>
+<div class="risk-bar"><div class="risk-bar-fill fill-med" id="traffic-risk-bar" style="width:34%"></div></div>
+</div>
+<div class="prediction-card">
+<div class="risk-label">Heat Risk</div>
+<div class="risk-value risk-low" id="heat-risk-val">5%</div>
+<div class="risk-bar"><div class="risk-bar-fill fill-low" id="heat-risk-bar" style="width:5%"></div></div>
+</div>
+</div>
+<div class="prediction-timeline">
+<div class="timeline-row"><div class="timeline-dot"></div><div class="timeline-label">24h</div><div class="timeline-value" id="pred-24h">Low risk period</div></div>
+<div class="timeline-row"><div class="timeline-dot"></div><div class="timeline-label">48h</div><div class="timeline-value" id="pred-48h">Moderate tide expected</div></div>
+<div class="timeline-row"><div class="timeline-dot alert"></div><div class="timeline-label">72h</div><div class="timeline-value" id="pred-72h">Storm surge warning</div></div>
+</div>
+</div>
+
+<!-- Phase 2: Flood Simulation -->
+<div class="panel-section">
+<div class="panel-title phase2">Flood Simulation</div>
+<div class="time-slider-container">
+<input type="range" class="flood-slider" id="flood-slider" min="0" max="20" step="0.1" value="0">
+<div class="slider-labels"><span>0m</span><span>5m</span><span>10m</span><span>15m</span><span>20m</span></div>
+<div class="current-time-label" id="flood-level-label" style="color:#4488cc">Water Level: 0.0m</div>
+</div>
+<div class="toggle-row" style="margin-top:10px"><span class="toggle-label">Show Evacuation Routes</span><div class="toggle-switch" id="evac-toggle"></div></div>
+<div class="toggle-row"><span class="toggle-label">Auto Flood (AI)</span><div class="toggle-switch" id="auto-flood-toggle"></div></div>
+</div>
+
+<!-- Phase 2: Disaster Simulation -->
+<div class="panel-section">
+<div class="panel-title phase2">Disaster Simulation</div>
+<div class="time-slider-container">
+<input type="range" class="disaster-slider" id="earthquake-slider" min="0" max="10" step="0.1" value="0">
+<div class="slider-labels"><span>0</span><span>2.5</span><span>5</span><span>7.5</span><span>10</span></div>
+<div class="current-time-label" id="earthquake-label" style="color:#cc4444">Earthquake: 0.0 Richter</div>
+</div>
+<div style="display:flex;gap:8px;margin-top:10px">
+<button class="action-btn danger" id="fire-sim-btn" style="flex:1;font-size:0.7rem;padding:8px">Fire Simulation</button>
+<button class="action-btn danger" id="quake-sim-btn" style="flex:1;font-size:0.7rem;padding:8px">Earthquake</button>
+</div>
+</div>
+
+<!-- Phase 2: Live Weather API -->
+<div class="panel-section">
+<div class="panel-title phase2">Live Weather API</div>
+<div class="toggle-row"><span class="toggle-label">Sync with Open-Meteo</span><div class="toggle-switch phase2" id="live-weather-toggle"></div></div>
+<div class="toggle-row"><span class="toggle-label">Satellite Overlay</span><div class="toggle-switch phase2" id="satellite-toggle"></div></div>
+<div class="toggle-row"><span class="toggle-label">Heat Map</span><div class="toggle-switch phase2" id="heatmap-toggle"></div></div>
+<div style="margin-top:8px;padding:8px;border-radius:8px;background:rgba(143,162,138,0.05);font-size:0.65rem;color:rgba(247,244,237,0.5)">
+API: <span style="color:#8FA28A">Open-Meteo</span> | Last sync: <span id="last-sync">Never</span>
+</div>
+</div>
+
+<!-- Phase 2: Digital Twin Analytics -->
+<div class="panel-section">
+<div class="panel-title phase2">Digital Twin Analytics</div>
+<div class="analytics-grid">
+<div class="analytics-card">
+<div class="metric-label">Population</div>
+<div class="metric-value" id="metric-pop">142,580</div>
+<div class="metric-bar"><div class="metric-bar-fill" style="width:72%"></div></div>
+</div>
+<div class="analytics-card">
+<div class="metric-label">Traffic Flow</div>
+<div class="metric-value" id="metric-traffic">8,420</div>
+<div class="metric-bar"><div class="metric-bar-fill" style="width:45%"></div></div>
+</div>
+<div class="analytics-card">
+<div class="metric-label">Energy Use</div>
+<div class="metric-value" id="metric-energy">234 MW</div>
+<div class="metric-bar"><div class="metric-bar-fill" style="width:60%"></div></div>
+</div>
+<div class="analytics-card">
+<div class="metric-label">Air Quality</div>
+<div class="metric-value" id="metric-aqi">AQI 42</div>
+<div class="metric-bar"><div class="metric-bar-fill" style="width:42%"></div></div>
+</div>
+</div>
+</div>
+
+<!-- Phase 1: Graphics Quality -->
+<div class="panel-section">
+<div class="panel-title">Graphics Quality</div>
+<input type="range" class="quality-slider" id="quality-slider" min="1" max="5" step="1" value="3">
+<div class="quality-labels"><span>Low</span><span>Medium</span><span>High</span><span>Ultra</span><span>Max</span></div>
+</div>
+
+<!-- Phase 1: Actions -->
+<div class="panel-section">
+<div class="panel-title">Actions</div>
+<button class="action-btn primary" id="photo-mode-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg>Photo Mode</button>
+<button class="action-btn" id="reset-btn" style="margin-top:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Reset Scene</button>
+<button class="action-btn" id="fullscreen-btn" style="margin-top:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>Fullscreen</button>
+</div>
+</div>
+
+<!-- Bottom Stats -->
+<div class="bottom-stats animate-in delay-3">
+<div class="stat-pill"><span>Weather:</span><span class="value" id="stat-weather">Sunny</span></div>
+<div class="stat-pill"><span>Time:</span><span class="value" id="stat-time">12:00</span></div>
+<div class="stat-pill"><span>Objects:</span><span class="value" id="stat-objects">0</span></div>
+<div class="stat-pill"><span>AI Status:</span><span class="value" id="stat-ai">Active</span></div>
+</div>
+</div>
+
+<!-- Photo Mode Overlay -->
+<div class="photo-mode-overlay" id="photo-mode-overlay">
+<div class="photo-frame"></div>
+<div class="photo-controls">
+<button class="photo-btn" id="photo-capture">Capture</button>
+<button class="photo-btn" id="photo-exit">Exit</button>
+</div>
+</div>
+
+<!-- Twin Capture Overlay -->
+<div class="photo-mode-overlay" id="twin-capture-overlay" style="z-index: 300; background: rgba(10,10,15,0.9);">
+    <div style="position:absolute; top:20px; left:50%; transform:translateX(-50%); font-size:1.5rem; color:#C8A96B; font-weight:600;">CAPTURE CITY IMAGE</div>
+    
+    <div style="position:absolute; top:80px; left:50%; transform:translateX(-50%); width:80%; height:60%; border:2px dashed rgba(200,169,107,0.5); border-radius:12px; display:flex; flex-direction:column; align-items:center; justify-content:center; overflow:hidden;">
+        <video id="twin-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover; display:none;"></video>
+        <canvas id="twin-canvas" style="display:none; width:100%; height:100%; object-fit:cover;"></canvas>
+        <div id="twin-placeholder" style="color:rgba(247,244,237,0.5); text-align:center;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:12px;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg><br>
+            Activate Camera or Upload Image
+        </div>
+    </div>
+
+    <div class="photo-controls" style="bottom: 40px; gap: 20px;">
+        <button class="photo-btn" id="twin-start-cam">Start Camera</button>
+        <button class="photo-btn" id="twin-upload-btn">Upload Image</button>
+        <input type="file" id="twin-file-input" accept="image/*" style="display:none;">
+        <button class="photo-btn" id="twin-snap" style="display:none; background:rgba(200,169,107,0.3);">Snap & Generate</button>
+        <button class="photo-btn" id="twin-exit">Cancel</button>
+    </div>
+</div>
+
+<!-- AI Chat Widget -->
+<button class="ai-chat-toggle" id="ai-chat-toggle">AI</button>
+<div class="ai-chat-widget" id="ai-chat-widget">
+<div class="ai-chat-header">
+<div class="ai-avatar">AI</div>
+<div class="ai-title">City Assistant</div>
+<div class="ai-status">Online</div>
+</div>
+<div class="ai-chat-messages" id="ai-chat-messages">
+<div class="ai-message bot">Hello! I'm your Coastal City AI Assistant. I can help you with disaster predictions, weather analysis, and city insights. How can I assist you today?</div>
+</div>
+<div class="ai-chat-input">
+<input type="text" id="ai-chat-input" placeholder="Ask about weather, floods, traffic...">
+<button id="ai-chat-send">Send</button>
+</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ============================================================
+// GLOBAL STATE - Phase 1 + Phase 2
+// ============================================================
+const state = {
+    time: 12, weather: 'sunny', cameraMode: 'orbit',
+    autoTime: true, trafficEnabled: true, pedestriansEnabled: true,
+    soundEnabled: false, quality: 3, photoMode: false,
+    introComplete: false, fps: 60, frameCount: 0, lastFpsTime: performance.now(),
+    // Phase 2
+    floodLevel: 0, autoFlood: false, showEvacuation: false,
+    earthquakeIntensity: 0, fireSimulation: false,
+    liveWeather: false, satelliteOverlay: false, heatMap: false,
+    aiActive: true,
+};
+
+// ============================================================
+// SCENE SETUP
+// ============================================================
+const container = document.getElementById('canvas-container');
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x87CEEB, 0.002);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+container.appendChild(renderer.domElement);
+
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+const bloomPass = new UnrealBloomPass(
+    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    0.3, 0.4, 0.85
+);
+composer.addPass(bloomPass);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.maxPolarAngle = Math.PI / 2.1;
+controls.minDistance = 5;
+controls.maxDistance = 300;
+controls.target.set(0, 5, 0);
+
+const colors = {
+    primaryGreen: 0x8FA28A, softSage: 0xC7D3C0, warmWhite: 0xF7F4ED,
+    premiumGold: 0xC8A96B, ocean: 0x1a5f7a, oceanDeep: 0x0d3b4c,
+    sand: 0xE8DCC8, road: 0x3a3a3a, sidewalk: 0x8a8a8a, grass: 0x4a7c59,
+    buildingConcrete: 0xC8C8C8, buildingGlass: 0x87CEEB,
+    buildingDark: 0x5a5a5a, buildingLight: 0xE8E8E8,
+    nightSky: 0x0a0a1a, daySky: 0x87CEEB, sunsetSky: 0xFF8C42,
+};
+
+// ============================================================
+// LIGHTING
+// ============================================================
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+scene.add(ambientLight);
+
+const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
+sunLight.position.set(50, 100, 50);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.width = 2048;
+sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.camera.near = 0.5;
+sunLight.shadow.camera.far = 500;
+sunLight.shadow.camera.left = -150;
+sunLight.shadow.camera.right = 150;
+sunLight.shadow.camera.top = 150;
+sunLight.shadow.camera.bottom = -150;
+sunLight.shadow.bias = -0.0005;
+scene.add(sunLight);
+
+const moonLight = new THREE.DirectionalLight(0x6688aa, 0.3);
+moonLight.position.set(-50, 80, -50);
+moonLight.castShadow = true;
+moonLight.visible = false;
+scene.add(moonLight);
+
+const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x4a7c59, 0.5);
+scene.add(hemiLight);
+
+// ============================================================
+// SKYBOX & STARS
+// ============================================================
+const skyGeometry = new THREE.SphereGeometry(900, 32, 32);
+const skyMaterial = new THREE.MeshBasicMaterial({ color: colors.daySky, side: THREE.BackSide });
+const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+scene.add(sky);
+
+const starsGeometry = new THREE.BufferGeometry();
+const starsCount = 3000;
+const starsPositions = new Float32Array(starsCount * 3);
+for (let i = 0; i < starsCount * 3; i += 3) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(Math.random() * 2 - 1);
+    const r = 800;
+    starsPositions[i] = r * Math.sin(phi) * Math.cos(theta);
+    starsPositions[i+1] = r * Math.sin(phi) * Math.sin(theta);
+    starsPositions[i+2] = r * Math.cos(phi);
+}
+starsGeometry.setAttribute('position', new THREE.BufferAttribute(starsPositions, 3));
+const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5, transparent: true, opacity: 0 });
+const stars = new THREE.Points(starsGeometry, starsMaterial);
+scene.add(stars);
+
+// ============================================================
+// GROUND & TERRAIN
+// ============================================================
+const groundGeometry = new THREE.PlaneGeometry(400, 400, 100, 100);
+const groundMaterial = new THREE.MeshStandardMaterial({ color: colors.grass, roughness: 0.9, metalness: 0.0 });
+
+const groundPositions = groundGeometry.attributes.position;
+for (let i = 0; i < groundPositions.count; i++) {
+    const x = groundPositions.getX(i);
+    const y = groundPositions.getY(i);
+    if (y < -30) {
+        groundPositions.setZ(i, -5 - Math.random() * 2);
+    } else if (y < -20) {
+        groundPositions.setZ(i, -2 + Math.random() * 1);
+    } else {
+        groundPositions.setZ(i, Math.random() * 0.5);
+    }
+}
+groundGeometry.computeVertexNormals();
+
+const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ============================================================
+// OCEAN
+// ============================================================
+const oceanGeometry = new THREE.PlaneGeometry(400, 200, 100, 50);
+const oceanMaterial = new THREE.MeshStandardMaterial({
+    color: colors.ocean, roughness: 0.1, metalness: 0.8, transparent: true, opacity: 0.85,
+});
+const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial);
+ocean.rotation.x = -Math.PI / 2;
+ocean.position.set(0, -2, -100);
+scene.add(ocean);
+
+const oceanOriginalPositions = oceanGeometry.attributes.position.clone();
+
+// Beach
+const beachGeometry = new THREE.PlaneGeometry(400, 25, 50, 10);
+const beachMaterial = new THREE.MeshStandardMaterial({ color: colors.sand, roughness: 1.0, metalness: 0.0 });
+const beach = new THREE.Mesh(beachGeometry, beachMaterial);
+beach.rotation.x = -Math.PI / 2;
+beach.position.set(0, 0.1, -42);
+beach.receiveShadow = true;
+scene.add(beach);
+
+// ============================================================
+// PHASE 2: FLOOD WATER (initially hidden below ground)
+// ============================================================
+const floodGeometry = new THREE.PlaneGeometry(400, 400, 100, 100);
+const floodMaterial = new THREE.MeshStandardMaterial({
+    color: 0x2266aa, roughness: 0.05, metalness: 0.9,
+    transparent: true, opacity: 0.7,
+});
+const floodWater = new THREE.Mesh(floodGeometry, floodMaterial);
+floodWater.rotation.x = -Math.PI / 2;
+floodWater.position.set(0, -10, 0);
+floodWater.visible = false;
+scene.add(floodWater);
+
+// ============================================================
+// PHASE 2: SATELLITE HEAT MAP OVERLAY
+// ============================================================
+function createHeatMapTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // Create gradient heat map
+    const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+    gradient.addColorStop(0, 'rgba(255, 50, 50, 0.6)');
+    gradient.addColorStop(0.3, 'rgba(255, 150, 50, 0.4)');
+    gradient.addColorStop(0.6, 'rgba(255, 255, 50, 0.3)');
+    gradient.addColorStop(1, 'rgba(50, 255, 50, 0.1)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Add some random hotspots
+    for (let i = 0; i < 20; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const r = 20 + Math.random() * 60;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, 'rgba(255, 100, 100, 0.5)');
+        g.addColorStop(1, 'rgba(255, 100, 100, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 512, 512);
+    }
+
+    return new THREE.CanvasTexture(canvas);
+}
+
+const heatMapTexture = createHeatMapTexture();
+const heatMapGeometry = new THREE.PlaneGeometry(400, 400);
+const heatMapMaterial = new THREE.MeshBasicMaterial({
+    map: heatMapTexture, transparent: true, opacity: 0,
+    side: THREE.DoubleSide, depthWrite: false,
+});
+const heatMapMesh = new THREE.Mesh(heatMapGeometry, heatMapMaterial);
+heatMapMesh.rotation.x = -Math.PI / 2;
+heatMapMesh.position.y = 0.5;
+scene.add(heatMapMesh);
+
+// ============================================================
+// BUILDING GENERATOR
+// ============================================================
+const buildings = [];
+const buildingLights = [];
+const buildingOriginalPositions = [];
+
+function createBuilding(x, z, width, depth, height, type) {
+    const group = new THREE.Group();
+    group.position.set(x, height / 2, z);
+
+    let geometry, material;
+    if (type === 'skyscraper') {
+        geometry = new THREE.BoxGeometry(width, height, depth);
+        material = new THREE.MeshStandardMaterial({
+            color: colors.buildingGlass, roughness: 0.1, metalness: 0.9,
+            transparent: true, opacity: 0.7,
+        });
+    } else if (type === 'modern') {
+        geometry = new THREE.BoxGeometry(width, height, depth);
+        material = new THREE.MeshStandardMaterial({ color: colors.buildingLight, roughness: 0.3, metalness: 0.4 });
+    } else if (type === 'residential') {
+        geometry = new THREE.BoxGeometry(width, height, depth);
+        material = new THREE.MeshStandardMaterial({ color: colors.buildingConcrete, roughness: 0.7, metalness: 0.1 });
+    } else {
+        geometry = new THREE.BoxGeometry(width, height, depth);
+        material = new THREE.MeshStandardMaterial({ color: colors.buildingDark, roughness: 0.5, metalness: 0.3 });
+    }
+
+    const building = new THREE.Mesh(geometry, material);
+    building.castShadow = true;
+    building.receiveShadow = true;
+    group.add(building);
+
+    if (type !== 'skyscraper') {
+        const windowRows = Math.floor(height / 3);
+        const windowCols = Math.floor(width / 2.5);
+        for (let row = 0; row < windowRows; row++) {
+            for (let col = 0; col < windowCols; col++) {
+                const winGeo = new THREE.PlaneGeometry(1.2, 1.5);
+                const winMat = new THREE.MeshStandardMaterial({
+                    color: 0x87CEEB, roughness: 0.1, metalness: 0.9,
+                    emissive: 0x222244, emissiveIntensity: 0.1,
+                });
+                const win = new THREE.Mesh(winGeo, winMat);
+                win.position.set(-width/2 + 1.5 + col * 2.5, -height/2 + 2 + row * 3, depth/2 + 0.01);
+                group.add(win);
+                buildingLights.push(winMat);
+
+                const winBack = win.clone();
+                winBack.position.z = -depth/2 - 0.01;
+                winBack.rotation.y = Math.PI;
+                group.add(winBack);
+                buildingLights.push(winBack.material);
+            }
+        }
+    }
+
+    if (height > 15) {
+        const antennaGeo = new THREE.CylinderGeometry(0.1, 0.1, 5, 8);
+        const antennaMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+        const antenna = new THREE.Mesh(antennaGeo, antennaMat);
+        antenna.position.y = height / 2 + 2.5;
+        group.add(antenna);
+
+        const beaconGeo = new THREE.SphereGeometry(0.3, 8, 8);
+        const beaconMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 2 });
+        const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+        beacon.position.y = height / 2 + 5;
+        group.add(beacon);
+    }
+
+    if (type === 'residential' && height > 10) {
+        for (let i = 1; i < height / 4; i++) {
+            const balconyGeo = new THREE.BoxGeometry(width + 1, 0.3, 1.5);
+            const balconyMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+            const balcony = new THREE.Mesh(balconyGeo, balconyMat);
+            balcony.position.set(0, -height/2 + i * 4, depth/2 + 0.5);
+            group.add(balcony);
+        }
+    }
+
+    scene.add(group);
+    buildings.push(group);
+    buildingOriginalPositions.push(group.position.clone());
+    return group;
+}
+
+function generateCity() {
+    function isRoad(x, z) {
+        if (Math.abs(x) < 15) return true; // Main NS road
+        if (Math.abs(z) < 15) return true; // Main EW road
+        if (Math.abs(z + 30) < 10) return true; // Beach road
+        if (Math.abs(x - 60) < 10) return true; // East NS road
+        if (Math.abs(x + 60) < 10) return true; // West NS road
+        if (Math.abs(z - 40) < 10) return true; // North EW road 1
+        if (Math.abs(z - 80) < 10) return true; // North EW road 2
+        return false;
+    }
+    
+    let attempts = 0;
+    let placed = 0;
+    while(placed < 12 && attempts < 100) {
+        const x = (Math.random() - 0.5) * 80;
+        const z = (Math.random() - 0.5) * 60 + 20;
+        attempts++;
+        if (isRoad(x, z)) continue;
+        createBuilding(x, z, 8 + Math.random() * 6, 8 + Math.random() * 6, 40 + Math.random() * 60, 'skyscraper');
+        placed++;
+    }
+    placed = 0; attempts = 0;
+    while(placed < 20 && attempts < 200) {
+        const x = (Math.random() - 0.5) * 120;
+        const z = (Math.random() - 0.5) * 80 + 40;
+        attempts++;
+        if (isRoad(x, z)) continue;
+        createBuilding(x, z, 10 + Math.random() * 8, 10 + Math.random() * 8, 15 + Math.random() * 25, 'modern');
+        placed++;
+    }
+    placed = 0; attempts = 0;
+    while(placed < 25 && attempts < 200) {
+        const x = (Math.random() - 0.5) * 140;
+        const z = (Math.random() - 0.5) * 60 + 80;
+        attempts++;
+        if (isRoad(x, z)) continue;
+        createBuilding(x, z, 8 + Math.random() * 6, 8 + Math.random() * 6, 8 + Math.random() * 15, 'residential');
+        placed++;
+    }
+    
+    // Fixed landmarks, check manual offsets so they don't clip
+    if(!isRoad(-60, -15)) createBuilding(-60, -15, 20, 15, 25, 'modern');
+    if(!isRoad(-20, -15)) createBuilding(-20, -15, 20, 15, 25, 'modern');
+    if(!isRoad(20, -15)) createBuilding(20, -15, 20, 15, 25, 'modern');
+    if(!isRoad(60, -15)) createBuilding(60, -15, 20, 15, 25, 'modern');
+    
+    if(!isRoad(30, 60)) createBuilding(30, 60, 35, 25, 8, 'modern');
+    if(!isRoad(-50, 70)) createBuilding(-50, 70, 20, 20, 12, 'modern');
+    if(!isRoad(-70, 50)) createBuilding(-70, 50, 12, 10, 6, 'modern');
+    if(!isRoad(60, 50)) createBuilding(60, 50, 12, 10, 6, 'modern');
+}
+
+generateCity();
+
+function createRoad(x, z, width, length, rotation) {
+    const roadGeo = new THREE.PlaneGeometry(width, length);
+    const roadMat = new THREE.MeshStandardMaterial({ color: colors.road, roughness: 0.9 });
+    const road = new THREE.Mesh(roadGeo, roadMat);
+    road.rotation.x = -Math.PI / 2;
+    road.rotation.z = rotation || 0;
+    road.position.set(x, 0.02, z);
+    road.receiveShadow = true;
+    scene.add(road);
+
+    if (width > 8) {
+        const lineGeo = new THREE.PlaneGeometry(0.3, length);
+        const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const line = new THREE.Mesh(lineGeo, lineMat);
+        line.rotation.x = -Math.PI / 2;
+        line.rotation.z = rotation || 0;
+        line.position.set(x, 0.03, z);
+        scene.add(line);
+    }
+    return road;
+}
+
+createRoad(0, 0, 16, 200, 0);
+createRoad(0, 0, 260, 16, 0);
+createRoad(0, -30, 260, 12, 0);
+createRoad(-60, 0, 12, 160, 0);
+createRoad(60, 0, 12, 160, 0);
+createRoad(0, 40, 160, 12, 0);
+createRoad(0, 80, 160, 10, 0);
+
+function createSidewalk(x, z, width, length, rotation) {
+    const swGeo = new THREE.PlaneGeometry(width, length);
+    const swMat = new THREE.MeshStandardMaterial({ color: colors.sidewalk, roughness: 0.8 });
+    const sw = new THREE.Mesh(swGeo, swMat);
+    sw.rotation.x = -Math.PI / 2;
+    sw.rotation.z = rotation || 0;
+    sw.position.set(x, 0.04, z);
+    sw.receiveShadow = true;
+    scene.add(sw);
+}
+
+createSidewalk(0, 10, 200, 3, 0);
+createSidewalk(0, -10, 200, 3, 0);
+createSidewalk(10, 0, 3, 200, 0);
+createSidewalk(-10, 0, 3, 200, 0);
+
+const trees = [];
+
+function createTree(x, z, scale, type) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    group.scale.setScalar(scale || 1);
+
+    const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 3, 8);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033 });
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = 1.5;
+    trunk.castShadow = true;
+    group.add(trunk);
+
+    if (type === 'palm') {
+        const foliageGeo = new THREE.SphereGeometry(2, 8, 6);
+        const foliageMat = new THREE.MeshStandardMaterial({ color: 0x4a7c3f });
+        const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+        foliage.position.y = 4;
+        foliage.scale.y = 0.6;
+        foliage.castShadow = true;
+        group.add(foliage);
+
+        for (let i = 0; i < 8; i++) {
+            const frondGeo = new THREE.ConeGeometry(0.3, 3, 4);
+            const frond = new THREE.Mesh(frondGeo, foliageMat);
+            frond.position.y = 4;
+            frond.rotation.z = Math.PI / 3;
+            frond.rotation.y = (i / 8) * Math.PI * 2;
+            frond.position.x = Math.cos((i / 8) * Math.PI * 2) * 1.5;
+            frond.position.z = Math.sin((i / 8) * Math.PI * 2) * 1.5;
+            group.add(frond);
+        }
+    } else {
+        const foliageGeo = new THREE.SphereGeometry(2.5, 8, 6);
+        const foliageMat = new THREE.MeshStandardMaterial({ color: colors.primaryGreen });
+        const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+        foliage.position.y = 4;
+        foliage.castShadow = true;
+        group.add(foliage);
+
+        const foliage2 = new THREE.Mesh(new THREE.SphereGeometry(1.8, 8, 6), foliageMat);
+        foliage2.position.y = 5.5;
+        foliage2.castShadow = true;
+        group.add(foliage2);
+    }
+
+    scene.add(group);
+    trees.push({ mesh: group, originalScale: scale || 1, type });
+    return group;
+}
+
+for (let i = -90; i <= 90; i += 15) {
+    if (Math.abs(i) < 10) continue;
+    createTree(i, 12, 0.8 + Math.random() * 0.4);
+    createTree(i, -12, 0.8 + Math.random() * 0.4);
+}
+for (let i = 0; i < 30; i++) {
+    const x = (Math.random() - 0.5) * 60;
+    const z = 60 + Math.random() * 40;
+    createTree(x, z, 0.7 + Math.random() * 0.5);
+}
+for (let i = -90; i <= 90; i += 12) {
+    createTree(i, -35, 1.2, 'palm');
+    createTree(i + 6, -38, 1.0, 'palm');
+}
+
+// LIGHTHOUSE
+const lighthouseGroup = new THREE.Group();
+lighthouseGroup.position.set(-80, 0, -60);
+
+const lhBaseGeo = new THREE.CylinderGeometry(4, 5, 3, 16);
+const lhBaseMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+const lhBase = new THREE.Mesh(lhBaseGeo, lhBaseMat);
+lhBase.position.y = 1.5;
+lhBase.castShadow = true;
+lighthouseGroup.add(lhBase);
+
+const lhTowerGeo = new THREE.CylinderGeometry(2, 3.5, 20, 16);
+const lhTowerMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+const lhTower = new THREE.Mesh(lhTowerGeo, lhTowerMat);
+lhTower.position.y = 13;
+lhTower.castShadow = true;
+lighthouseGroup.add(lhTower);
+
+for (let i = 0; i < 3; i++) {
+    const stripeGeo = new THREE.CylinderGeometry(2.05, 2.05, 2, 16);
+    const stripeMat = new THREE.MeshStandardMaterial({ color: 0xcc0000 });
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    stripe.position.y = 6 + i * 6;
+    lighthouseGroup.add(stripe);
+}
+
+const lhLanternGeo = new THREE.CylinderGeometry(2.5, 2, 3, 16);
+const lhLanternMat = new THREE.MeshStandardMaterial({
+    color: 0xffffaa, emissive: 0xffffaa, emissiveIntensity: 1, transparent: true, opacity: 0.8,
+});
+const lhLantern = new THREE.Mesh(lhLanternGeo, lhLanternMat);
+lhLantern.position.y = 24.5;
+lighthouseGroup.add(lhLantern);
+
+const beamGeo = new THREE.ConeGeometry(8, 60, 32, 1, true);
+const beamMat = new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: 0.1, side: THREE.DoubleSide });
+const beam = new THREE.Mesh(beamGeo, beamMat);
+beam.position.set(0, 24.5, 30);
+beam.rotation.x = Math.PI / 2;
+lighthouseGroup.add(beam);
+
+const lhLight = new THREE.PointLight(0xffffaa, 2, 100);
+lhLight.position.y = 24.5;
+lighthouseGroup.add(lhLight);
+
+scene.add(lighthouseGroup);
+
+// BRIDGE
+const bridgeGroup = new THREE.Group();
+const bridgeDeckGeo = new THREE.BoxGeometry(8, 1, 60);
+const bridgeDeckMat = new THREE.MeshStandardMaterial({ color: 0x666666 });
+const bridgeDeck = new THREE.Mesh(bridgeDeckGeo, bridgeDeckMat);
+bridgeDeck.position.set(40, 8, -50);
+bridgeDeck.castShadow = true;
+bridgeGroup.add(bridgeDeck);
+
+for (let i = 0; i < 4; i++) {
+    const supportGeo = new THREE.CylinderGeometry(1, 1.5, 10, 8);
+    const supportMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+    const support = new THREE.Mesh(supportGeo, supportMat);
+    support.position.set(40, 3, -70 + i * 15);
+    support.castShadow = true;
+    bridgeGroup.add(support);
+}
+
+const railingGeo = new THREE.BoxGeometry(0.3, 1.5, 60);
+const railingMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+const railing1 = new THREE.Mesh(railingGeo, railingMat);
+railing1.position.set(36, 9, -50);
+bridgeGroup.add(railing1);
+const railing2 = new THREE.Mesh(railingGeo, railingMat);
+railing2.position.set(44, 9, -50);
+bridgeGroup.add(railing2);
+
+scene.add(bridgeGroup);
+
+// PIER
+const pierGroup = new THREE.Group();
+const pierDeckGeo = new THREE.BoxGeometry(6, 0.5, 40);
+const pierDeckMat = new THREE.MeshStandardMaterial({ color: 0x8B7355 });
+const pierDeck = new THREE.Mesh(pierDeckGeo, pierDeckMat);
+pierDeck.position.set(-30, 1, -60);
+pierGroup.add(pierDeck);
+
+for (let i = 0; i < 8; i++) {
+    const postGeo = new THREE.CylinderGeometry(0.3, 0.3, 4, 8);
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x8B7355 });
+    const post = new THREE.Mesh(postGeo, postMat);
+    post.position.set(-33, -1, -75 + i * 5);
+    pierGroup.add(post);
+    const post2 = post.clone();
+    post2.position.x = -27;
+    pierGroup.add(post2);
+}
+
+scene.add(pierGroup);
+
+// BOATS
+const boats = [];
+
+function createBoat(x, z, type) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+
+    if (type === 'yacht') {
+        const hullGeo = new THREE.BoxGeometry(4, 1.5, 10);
+        const hullMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        const hull = new THREE.Mesh(hullGeo, hullMat);
+        hull.position.y = 0.5;
+        hull.castShadow = true;
+        group.add(hull);
+
+        const cabinGeo = new THREE.BoxGeometry(3, 1.5, 4);
+        const cabinMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
+        const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+        cabin.position.set(0, 2, -1);
+        cabin.castShadow = true;
+        group.add(cabin);
+
+        const winGeo = new THREE.PlaneGeometry(2, 0.8);
+        const winMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const win = new THREE.Mesh(winGeo, winMat);
+        win.position.set(0, 2, 1.01);
+        group.add(win);
+    } else if (type === 'fishing') {
+        const hullGeo = new THREE.BoxGeometry(2, 1, 5);
+        const hullMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+        const hull = new THREE.Mesh(hullGeo, hullMat);
+        hull.position.y = 0.3;
+        hull.castShadow = true;
+        group.add(hull);
+
+        const mastGeo = new THREE.CylinderGeometry(0.1, 0.1, 6, 8);
+        const mastMat = new THREE.MeshStandardMaterial({ color: 0x5c4033 });
+        const mast = new THREE.Mesh(mastGeo, mastMat);
+        mast.position.set(0, 3.5, 0);
+        group.add(mast);
+    } else {
+        const hullGeo = new THREE.BoxGeometry(8, 4, 20);
+        const hullMat = new THREE.MeshStandardMaterial({ color: 0xcc0000 });
+        const hull = new THREE.Mesh(hullGeo, hullMat);
+        hull.position.y = 1;
+        hull.castShadow = true;
+        group.add(hull);
+
+        for (let i = 0; i < 6; i++) {
+            const contGeo = new THREE.BoxGeometry(3, 2, 4);
+            const contColors = [0xcc0000, 0x00cc00, 0x0000cc, 0xcccc00];
+            const contMat = new THREE.MeshStandardMaterial({ color: contColors[i % 4] });
+            const cont = new THREE.Mesh(contGeo, contMat);
+            cont.position.set(0, 4, -6 + i * 3);
+            cont.castShadow = true;
+            group.add(cont);
+        }
+    }
+
+    scene.add(group);
+    boats.push({ mesh: group, type, speed: 0.02 + Math.random() * 0.03 });
+    return group;
+}
+
+createBoat(20, -80, 'yacht');
+createBoat(-10, -90, 'fishing');
+createBoat(50, -120, 'cargo');
+createBoat(-40, -70, 'yacht');
+createBoat(10, -100, 'fishing');
+
+// TRAFFIC
+const vehicles = [];
+
+function createVehicle(type, lane) {
+    const group = new THREE.Group();
+
+    let color;
+    if (type === 'taxi') color = 0xFFD700;
+    else if (type === 'bus') color = 0x0066cc;
+    else if (type === 'emergency') color = 0xcc0000;
+    else color = [0x333333, 0x666666, 0x999999, 0xcccccc, 0x1a1a1a, 0x4a4a4a][Math.floor(Math.random() * 6)];
+
+    const bodyGeo = new THREE.BoxGeometry(2, 1.2, 4);
+    const bodyMat = new THREE.MeshStandardMaterial({ color });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 0.8;
+    body.castShadow = true;
+    group.add(body);
+
+    const cabinGeo = new THREE.BoxGeometry(1.8, 0.8, 2);
+    const cabinMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+    const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+    cabin.position.set(0, 1.8, -0.3);
+    group.add(cabin);
+
+    const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 12);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    const wheelPositions = [[-1,0.4,-1.2],[1,0.4,-1.2],[-1,0.4,1.2],[1,0.4,1.2]];
+    wheelPositions.forEach(pos => {
+        const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(...pos);
+        group.add(wheel);
+    });
+
+    const lightGeo = new THREE.SphereGeometry(0.2, 8, 8);
+    const lightMat = new THREE.MeshStandardMaterial({ color: 0xffffaa, emissive: 0xffffaa, emissiveIntensity: 1 });
+    const hl1 = new THREE.Mesh(lightGeo, lightMat);
+    hl1.position.set(-0.6, 0.8, 2);
+    group.add(hl1);
+    const hl2 = new THREE.Mesh(lightGeo, lightMat);
+    hl2.position.set(0.6, 0.8, 2);
+    group.add(hl2);
+
+    const tailGeo = new THREE.SphereGeometry(0.15, 8, 8);
+    const tailMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.5 });
+    const tl1 = new THREE.Mesh(tailGeo, tailMat);
+    tl1.position.set(-0.6, 0.8, -2);
+    group.add(tl1);
+    const tl2 = new THREE.Mesh(tailGeo, tailMat);
+    tl2.position.set(0.6, 0.8, -2);
+    group.add(tl2);
+
+    scene.add(group);
+    vehicles.push({
+        mesh: group, type, lane: lane || 0,
+        speed: 0.2,
+        direction: (lane || 0) % 2 === 0 ? 1 : -1,
+    });
+    return group;
+}
+
+for (let i = 0; i < 20; i++) {
+    const lane = i % 4;
+    const x = -100 + (Math.floor(i / 4) * 40);
+    const z = [4, -4, -26, -34][lane];
+    const direction = lane % 2 === 0 ? 1 : -1;
+    const v = createVehicle(['car','car','taxi','bus'][Math.floor(Math.random()*4)], lane);
+    v.position.set(x, 0, z);
+    if (direction === 1) {
+        v.rotation.y = Math.PI / 2;
+    } else {
+        v.rotation.y = -Math.PI / 2;
+    }
+}
+
+// PEDESTRIANS
+const pedestrians = [];
+
+function createPedestrian() {
+    const group = new THREE.Group();
+
+    const bodyGeo = new THREE.CylinderGeometry(0.3, 0.3, 1.6, 8);
+    const bodyColors = [0x3366cc, 0xcc3333, 0x33cc33, 0xcc9933, 0x9933cc];
+    const bodyMat = new THREE.MeshStandardMaterial({ color: bodyColors[Math.floor(Math.random()*5)] });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 0.8;
+    body.castShadow = true;
+    group.add(body);
+
+    const headGeo = new THREE.SphereGeometry(0.25, 8, 8);
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xffccaa });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = 1.8;
+    group.add(head);
+
+    scene.add(group);
+    pedestrians.push({
+        mesh: group,
+        speed: 0.02 + Math.random() * 0.03,
+        direction: new THREE.Vector3((Math.random()-0.5)*2, 0, (Math.random()-0.5)*2).normalize(),
+        walkOffset: Math.random() * Math.PI * 2,
+    });
+    return group;
+}
+
+for (let i = 0; i < 30; i++) {
+    const p = createPedestrian();
+    p.position.set((Math.random()-0.5)*100, 0, (Math.random()-0.5)*80 + 20);
+}
+
+// CLOUDS
+const clouds = [];
+
+function createCloud(x, y, z, scale) {
+    const group = new THREE.Group();
+    group.position.set(x, y, z);
+    group.scale.setScalar(scale || 1);
+
+    const cloudMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff, roughness: 1, transparent: true, opacity: 0.8,
+    });
+
+    for (let i = 0; i < 5 + Math.random() * 5; i++) {
+        const puffGeo = new THREE.SphereGeometry(3 + Math.random() * 4, 8, 6);
+        const puff = new THREE.Mesh(puffGeo, cloudMat);
+        puff.position.set((Math.random()-0.5)*10, (Math.random()-0.5)*3, (Math.random()-0.5)*6);
+        puff.scale.y = 0.6;
+        group.add(puff);
+    }
+
+    scene.add(group);
+    clouds.push({ mesh: group, speed: 0.01 + Math.random() * 0.02 });
+    return group;
+}
+
+for (let i = 0; i < 15; i++) {
+    createCloud((Math.random()-0.5)*300, 60 + Math.random()*40, (Math.random()-0.5)*200, 0.8 + Math.random()*1.5);
+}
+
+// STREET LIGHTS
+const streetLights = [];
+
+function createStreetLight(x, z) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+
+    const poleGeo = new THREE.CylinderGeometry(0.15, 0.2, 6, 8);
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.y = 3;
+    pole.castShadow = true;
+    group.add(pole);
+
+    const armGeo = new THREE.BoxGeometry(0.1, 0.1, 2);
+    const arm = new THREE.Mesh(armGeo, poleMat);
+    arm.position.set(0, 5.8, 0.8);
+    group.add(arm);
+
+    const lampGeo = new THREE.SphereGeometry(0.3, 8, 8);
+    const lampMat = new THREE.MeshStandardMaterial({
+        color: 0xffffaa, emissive: 0xffffaa, emissiveIntensity: 0,
+    });
+    const lamp = new THREE.Mesh(lampGeo, lampMat);
+    lamp.position.set(0, 5.6, 1.5);
+    group.add(lamp);
+
+    const sl = new THREE.PointLight(0xffffaa, 0, 15);
+    sl.position.set(0, 5.4, 1.5);
+    group.add(sl);
+
+    scene.add(group);
+    streetLights.push({ mesh: group, lampMat, light: sl });
+    return group;
+}
+
+for (let i = -80; i <= 80; i += 20) {
+    createStreetLight(i, 14);
+    createStreetLight(i, -14);
+}
+
+// PARK BENCHES
+for (let i = 0; i < 10; i++) {
+    const benchGeo = new THREE.BoxGeometry(2, 0.1, 0.6);
+    const benchMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+    const bench = new THREE.Mesh(benchGeo, benchMat);
+    bench.position.set((Math.random()-0.5)*50, 0.3, 65 + Math.random()*30);
+    bench.rotation.y = Math.random() * Math.PI;
+    bench.castShadow = true;
+    scene.add(bench);
+
+    const legGeo = new THREE.BoxGeometry(0.1, 0.4, 0.5);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+    const leg1 = new THREE.Mesh(legGeo, legMat);
+    leg1.position.set(-0.8, 0.1, 0);
+    bench.add(leg1);
+    const leg2 = new THREE.Mesh(legGeo, legMat);
+    leg2.position.set(0.8, 0.1, 0);
+    bench.add(leg2);
+}
+
+// FOUNTAIN
+const fountainGroup = new THREE.Group();
+fountainGroup.position.set(0, 0, 50);
+
+const basinGeo = new THREE.CylinderGeometry(6, 6, 0.5, 32);
+const basinMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+const basin = new THREE.Mesh(basinGeo, basinMat);
+basin.position.y = 0.25;
+basin.receiveShadow = true;
+fountainGroup.add(basin);
+
+const centerGeo = new THREE.CylinderGeometry(0.5, 1, 3, 16);
+const centerMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa });
+const center = new THREE.Mesh(centerGeo, centerMat);
+center.position.y = 1.5;
+fountainGroup.add(center);
+
+scene.add(fountainGroup);
+
+const fountainParticles = [];
+for (let i = 0; i < 50; i++) {
+    const dropGeo = new THREE.SphereGeometry(0.05, 4, 4);
+    const dropMat = new THREE.MeshBasicMaterial({ color: 0x87CEEB, transparent: true, opacity: 0.6 });
+    const drop = new THREE.Mesh(dropGeo, dropMat);
+    drop.position.set(0, 3, 50);
+    scene.add(drop);
+    fountainParticles.push({
+        mesh: drop,
+        velocity: new THREE.Vector3((Math.random()-0.5)*0.3, 0.1 + Math.random()*0.2, (Math.random()-0.5)*0.3),
+        life: Math.random() * 100,
+    });
+}
+
+// FERRIS WHEEL
+const ferrisGroup = new THREE.Group();
+ferrisGroup.position.set(85, 0, 20); // Moved out of the city buildings
+
+const supportGeo = new THREE.CylinderGeometry(0.3, 0.5, 15, 8);
+const supportMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+const support1 = new THREE.Mesh(supportGeo, supportMat);
+support1.position.set(-4, 7.5, 0);
+support1.rotation.z = 0.3;
+ferrisGroup.add(support1);
+const support2 = new THREE.Mesh(supportGeo, supportMat);
+support2.position.set(4, 7.5, 0);
+support2.rotation.z = -0.3;
+ferrisGroup.add(support2);
+
+const wheelGeo = new THREE.TorusGeometry(10, 0.3, 8, 32);
+const wheelMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+wheel.position.y = 15;
+ferrisGroup.add(wheel);
+
+for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2;
+    const cabinGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+    const cabinMat = new THREE.MeshStandardMaterial({ color: 0xcc3333 });
+    const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+    cabin.position.set(Math.cos(angle) * 10, 15 + Math.sin(angle) * 10, 0);
+    ferrisGroup.add(cabin);
+}
+
+scene.add(ferrisGroup);
+
+// TRAFFIC LIGHTS
+const trafficLights = [];
+
+function createTrafficLight(x, z, rotation) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    group.rotation.y = rotation || 0;
+
+    const poleGeo = new THREE.CylinderGeometry(0.1, 0.1, 5, 8);
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.y = 2.5;
+    group.add(pole);
+
+    const boxGeo = new THREE.BoxGeometry(0.6, 1.5, 0.4);
+    const boxMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+    const box = new THREE.Mesh(boxGeo, boxMat);
+    box.position.set(0, 5, 0.3);
+    group.add(box);
+
+    const redGeo = new THREE.SphereGeometry(0.15, 8, 8);
+    const redMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 1 });
+    const red = new THREE.Mesh(redGeo, redMat);
+    red.position.set(0, 5.4, 0.52);
+    group.add(red);
+
+    const yellowGeo = new THREE.SphereGeometry(0.15, 8, 8);
+    const yellowMat = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 0.2 });
+    const yellow = new THREE.Mesh(yellowGeo, yellowMat);
+    yellow.position.set(0, 5, 0.52);
+    group.add(yellow);
+
+    const greenGeo = new THREE.SphereGeometry(0.15, 8, 8);
+    const greenMat = new THREE.MeshStandardMaterial({ color: 0x00ff00, emissive: 0x00ff00, emissiveIntensity: 0.2 });
+    const green = new THREE.Mesh(greenGeo, greenMat);
+    green.position.set(0, 4.6, 0.52);
+    group.add(green);
+
+    scene.add(group);
+    trafficLights.push({ mesh: group, redMat, yellowMat, greenMat, state: 0, timer: Math.random() * 200 });
+    return group;
+}
+
+createTrafficLight(10, 10, 0);
+createTrafficLight(-10, -10, Math.PI);
+createTrafficLight(10, -10, Math.PI / 2);
+createTrafficLight(-10, 10, -Math.PI / 2);
+
+// BIRDS
+const birds = [];
+
+function createBird() {
+    const group = new THREE.Group();
+
+    const bodyGeo = new THREE.ConeGeometry(0.1, 0.5, 4);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.rotation.z = Math.PI / 2;
+    group.add(body);
+
+    const wingGeo = new THREE.PlaneGeometry(0.8, 0.2);
+    const wingMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, side: THREE.DoubleSide });
+    const wing = new THREE.Mesh(wingGeo, wingMat);
+    wing.position.y = 0.1;
+    group.add(wing);
+
+    scene.add(group);
+    birds.push({
+        mesh: group,
+        center: new THREE.Vector3((Math.random()-0.5)*100, 30 + Math.random()*20, (Math.random()-0.5)*100),
+        radius: 10 + Math.random() * 20,
+        speed: 0.005 + Math.random() * 0.01,
+        angle: Math.random() * Math.PI * 2,
+        height: 30 + Math.random() * 20,
+    });
+    return group;
+}
+
+for (let i = 0; i < 15; i++) {
+    createBird();
+}
+
+// RAIN
+const rainGeometry = new THREE.BufferGeometry();
+const rainCount = 5000;
+const rainPositions = new Float32Array(rainCount * 3);
+for (let i = 0; i < rainCount * 3; i += 3) {
+    rainPositions[i] = (Math.random() - 0.5) * 300;
+    rainPositions[i+1] = Math.random() * 200;
+    rainPositions[i+2] = (Math.random() - 0.5) * 300;
+}
+rainGeometry.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+const rainMaterial = new THREE.PointsMaterial({
+    color: 0xaaaaaa, size: 0.3, transparent: true, opacity: 0,
+});
+const rain = new THREE.Points(rainGeometry, rainMaterial);
+scene.add(rain);
+
+// ============================================================
+// PHASE 2: EVACUATION ROUTES
+// ============================================================
+const evacuationRoutes = [];
+
+function createEvacuationRoute(points) {
+    const curve = new THREE.CatmullRomCurve3(points);
+    const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.3, 8, false);
+    const tubeMat = new THREE.MeshStandardMaterial({
+        color: 0x00ff66, emissive: 0x00ff66, emissiveIntensity: 1,
+        transparent: true, opacity: 0,
+    });
+    const tube = new THREE.Mesh(tubeGeo, tubeMat);
+    scene.add(tube);
+    evacuationRoutes.push(tubeMat);
+    return tube;
+}
+
+// Route 1: Coastal to inland
+const route1 = createEvacuationRoute([
+    new THREE.Vector3(-80, 0.5, -60),
+    new THREE.Vector3(-60, 0.5, -40),
+    new THREE.Vector3(-40, 0.5, -20),
+    new THREE.Vector3(-20, 0.5, 0),
+    new THREE.Vector3(0, 0.5, 20),
+    new THREE.Vector3(20, 0.5, 40),
+    new THREE.Vector3(40, 0.5, 60),
+]);
+
+// Route 2: City center to high ground
+const route2 = createEvacuationRoute([
+    new THREE.Vector3(0, 0.5, 0),
+    new THREE.Vector3(20, 0.5, 20),
+    new THREE.Vector3(40, 0.5, 40),
+    new THREE.Vector3(60, 0.5, 60),
+    new THREE.Vector3(80, 0.5, 80),
+]);
+
+// Route 3: Harbor to bridge
+const route3 = createEvacuationRoute([
+    new THREE.Vector3(-30, 0.5, -60),
+    new THREE.Vector3(-10, 0.5, -50),
+    new THREE.Vector3(10, 0.5, -45),
+    new THREE.Vector3(30, 0.5, -48),
+    new THREE.Vector3(40, 8.5, -50),
+]);
+
+// ============================================================
+// PHASE 2: FIRE / SMOKE PARTICLES
+// ============================================================
+const fireParticles = [];
+const smokeParticles = [];
+
+function createFireSystem(x, y, z) {
+    const fireGroup = new THREE.Group();
+    fireGroup.position.set(x, y, z);
+
+    // Fire particles
+    for (let i = 0; i < 30; i++) {
+        const fireGeo = new THREE.SphereGeometry(0.3 + Math.random() * 0.5, 6, 6);
+        const fireMat = new THREE.MeshBasicMaterial({
+            color: new THREE.Color().setHSL(0.05 + Math.random() * 0.1, 1, 0.5),
+            transparent: true, opacity: 0.8,
+        });
+        const fire = new THREE.Mesh(fireGeo, fireMat);
+        fire.position.set((Math.random()-0.5)*3, Math.random()*2, (Math.random()-0.5)*3);
+        fireGroup.add(fire);
+        fireParticles.push({ mesh: fire, mat: fireMat, baseY: fire.position.y, speed: 0.02 + Math.random()*0.03 });
+    }
+
+    // Smoke particles
+    for (let i = 0; i < 20; i++) {
+        const smokeGeo = new THREE.SphereGeometry(0.5 + Math.random(), 6, 6);
+        const smokeMat = new THREE.MeshBasicMaterial({
+            color: 0x333333, transparent: true, opacity: 0.3,
+        });
+        const smoke = new THREE.Mesh(smokeGeo, smokeMat);
+        smoke.position.set((Math.random()-0.5)*4, 2 + Math.random()*3, (Math.random()-0.5)*4);
+        fireGroup.add(smoke);
+        smokeParticles.push({ mesh: smoke, mat: smokeMat, baseY: smoke.position.y, speed: 0.01 + Math.random()*0.02 });
+    }
+
+    fireGroup.visible = false;
+    scene.add(fireGroup);
+    return fireGroup;
+}
+
+const fireSystems = [
+    createFireSystem(20, 0, 20),
+    createFireSystem(-30, 0, 40),
+    createFireSystem(50, 0, -10),
+];
+
+// ============================================================
+// PHASE 2: MINI GLOBE
+// ============================================================
+const globeContainer = document.getElementById('mini-globe');
+const globeScene = new THREE.Scene();
+const globeCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+globeCamera.position.set(0, 0, 3);
+
+const globeRenderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+globeRenderer.setSize(120, 120);
+globeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+globeContainer.appendChild(globeRenderer.domElement);
+
+const globeGeo = new THREE.SphereGeometry(1, 32, 32);
+const globeMat = new THREE.MeshBasicMaterial({
+    color: 0x1a5f7a, wireframe: true, transparent: true, opacity: 0.6,
+});
+const globe = new THREE.Mesh(globeGeo, globeMat);
+globeScene.add(globe);
+
+const landGeo = new THREE.SphereGeometry(0.99, 32, 32);
+const landMat = new THREE.MeshBasicMaterial({ color: 0x4a7c59, wireframe: true, transparent: true, opacity: 0.3 });
+const land = new THREE.Mesh(landGeo, landMat);
+globeScene.add(land);
+
+const cityMarkerGeo = new THREE.SphereGeometry(0.05, 8, 8);
+const cityMarkerMat = new THREE.MeshBasicMaterial({ color: 0xC8A96B });
+const cityMarker = new THREE.Mesh(cityMarkerGeo, cityMarkerMat);
+cityMarker.position.set(0.3, 0.5, 0.8);
+globeScene.add(cityMarker);
+
+const globeLight = new THREE.DirectionalLight(0xffffff, 1);
+globeLight.position.set(2, 2, 2);
+globeScene.add(globeLight);
+
+// ============================================================
+// DAY/NIGHT CYCLE
+// ============================================================
+function updateDayNightCycle(time) {
+    const t = time / 24;
+    const sunAngle = (t - 0.25) * Math.PI * 2;
+
+    sunLight.position.x = Math.cos(sunAngle) * 100;
+    sunLight.position.y = Math.sin(sunAngle) * 100;
+    sunLight.position.z = 50;
+
+    const isDay = time > 6 && time < 18;
+    const isSunset = (time > 17 && time < 19) || (time > 5 && time < 7);
+
+    if (isDay) {
+        const dayIntensity = Math.sin((time - 6) / 12 * Math.PI);
+        sunLight.intensity = dayIntensity * 1.5;
+        ambientLight.intensity = 0.3 + dayIntensity * 0.3;
+
+        if (isSunset) {
+            skyMaterial.color.setHex(colors.sunsetSky);
+            hemiLight.color.setHex(colors.sunsetSky);
+        } else {
+            skyMaterial.color.setHex(colors.daySky);
+            hemiLight.color.setHex(colors.daySky);
+        }
+
+        starsMaterial.opacity = 0;
+        moonLight.visible = false;
+
+        streetLights.forEach(sl => {
+            sl.lampMat.emissiveIntensity = 0;
+            sl.light.intensity = 0;
+        });
+
+        buildingLights.forEach(mat => {
+            mat.emissiveIntensity = 0.1;
+        });
+    } else {
+        sunLight.intensity = 0;
+        ambientLight.intensity = 0.1;
+        skyMaterial.color.setHex(colors.nightSky);
+        hemiLight.color.setHex(0x1a1a3e);
+
+        const nightProgress = 1 - Math.abs(time - 12) / 12;
+        starsMaterial.opacity = nightProgress * 0.8;
+        moonLight.visible = true;
+
+        streetLights.forEach(sl => {
+            sl.lampMat.emissiveIntensity = 1;
+            sl.light.intensity = 1;
+        });
+
+        buildingLights.forEach(mat => {
+            mat.emissiveIntensity = 0.5 + Math.random() * 0.3;
+        });
+    }
+
+    const fogDensity = isDay ? 0.002 : 0.005;
+    scene.fog.density = THREE.MathUtils.lerp(scene.fog.density, fogDensity, 0.01);
+}
+
+// ============================================================
+// WEATHER SYSTEM
+// ============================================================
+function updateWeather(weather) {
+    switch(weather) {
+        case 'sunny':
+            rainMaterial.opacity = 0;
+            scene.fog.color.setHex(colors.daySky);
+            scene.fog.density = 0.002;
+            bloomPass.strength = 0.3;
+            break;
+        case 'cloudy':
+            rainMaterial.opacity = 0;
+            scene.fog.color.setHex(0x999999);
+            scene.fog.density = 0.004;
+            bloomPass.strength = 0.2;
+            break;
+        case 'rain':
+            rainMaterial.opacity = 0.6;
+            scene.fog.color.setHex(0x666666);
+            scene.fog.density = 0.006;
+            bloomPass.strength = 0.15;
+            break;
+        case 'storm':
+            rainMaterial.opacity = 0.9;
+            scene.fog.color.setHex(0x333333);
+            scene.fog.density = 0.008;
+            bloomPass.strength = 0.1;
+            break;
+        case 'fog':
+            rainMaterial.opacity = 0;
+            scene.fog.color.setHex(0xaaaaaa);
+            scene.fog.density = 0.015;
+            bloomPass.strength = 0.1;
+            break;
+        case 'wind':
+            rainMaterial.opacity = 0;
+            scene.fog.color.setHex(colors.daySky);
+            scene.fog.density = 0.003;
+            bloomPass.strength = 0.25;
+            break;
+    }
+}
+
+// ============================================================
+// CAMERA SYSTEM
+// ============================================================
+const cameraModes = {
+    orbit: { pos: new THREE.Vector3(100, 75, 100), target: new THREE.Vector3(0, 0, 0) },
+    drone: { pos: new THREE.Vector3(0, 160, 20), target: new THREE.Vector3(0, 0, 0) },
+    street: { pos: new THREE.Vector3(-40, 2, 4), target: new THREE.Vector3(100, 2, 4) },
+    cinematic: { pos: new THREE.Vector3(140, 30, -100), target: new THREE.Vector3(-20, 10, 20) },
+};
+
+function setCameraMode(mode) {
+    state.cameraMode = mode;
+    const config = cameraModes[mode];
+    if (!config) return;
+
+    const startPos = camera.position.clone();
+    const startTarget = controls.target.clone();
+    const endPos = config.pos.clone();
+    const endTarget = config.target.clone();
+    let progress = 0;
+
+    function animateCamera() {
+        progress += 0.02;
+        if (progress >= 1) {
+            camera.position.copy(endPos);
+            controls.target.copy(endTarget);
+            return;
+        }
+        const t = 1 - Math.pow(1 - progress, 3);
+        camera.position.lerpVectors(startPos, endPos, t);
+        controls.target.lerpVectors(startTarget, endTarget, t);
+        requestAnimationFrame(animateCamera);
+    }
+    animateCamera();
+}
+
+function playIntro() {
+    camera.position.set(200, 150, 200);
+    controls.target.set(0, 0, 0);
+
+    let progress = 0;
+    const endPos = new THREE.Vector3(80, 60, 80);
+    const endTarget = new THREE.Vector3(0, 5, 0);
+
+    function animateIntro() {
+        progress += 0.005;
+        if (progress >= 1) {
+            state.introComplete = true;
+            return;
+        }
+        const t = 1 - Math.pow(1 - progress, 2);
+        camera.position.lerpVectors(new THREE.Vector3(200, 150, 200), endPos, t);
+        controls.target.lerpVectors(new THREE.Vector3(0, 0, 0), endTarget, t);
+        requestAnimationFrame(animateIntro);
+    }
+    animateIntro();
+}
+
+// ============================================================
+// PHASE 2: AI DISASTER PREDICTION MODULE
+// ============================================================
+const AIPrediction = {
+    risks: { flood: 12, storm: 8, traffic: 34, heat: 5 },
+
+    update() {
+        // Simulate AI analysis based on current conditions
+        const time = state.time;
+        const weather = state.weather;
+
+        // Flood risk increases with rain/storm and high tide (evening)
+        let floodRisk = 5;
+        if (weather === 'rain') floodRisk += 25;
+        if (weather === 'storm') floodRisk += 45;
+        if (time > 18 || time < 6) floodRisk += 10; // High tide
+        if (state.floodLevel > 5) floodRisk += 20;
+        floodRisk = Math.min(95, Math.max(0, floodRisk + (Math.random() - 0.5) * 4));
+
+        // Storm risk
+        let stormRisk = 3;
+        if (weather === 'cloudy') stormRisk += 15;
+        if (weather === 'rain') stormRisk += 30;
+        if (weather === 'storm') stormRisk += 55;
+        stormRisk = Math.min(95, Math.max(0, stormRisk + (Math.random() - 0.5) * 3));
+
+        // Traffic risk
+        let trafficRisk = 20;
+        if (time > 7 && time < 9) trafficRisk += 30; // Morning rush
+        if (time > 17 && time < 19) trafficRisk += 25; // Evening rush
+        if (weather === 'rain') trafficRisk += 15;
+        if (weather === 'storm') trafficRisk += 25;
+        if (state.floodLevel > 3) trafficRisk += 20;
+        trafficRisk = Math.min(95, Math.max(0, trafficRisk + (Math.random() - 0.5) * 5));
+
+        // Heat risk
+        let heatRisk = 2;
+        if (time > 11 && time < 15) heatRisk += 20; // Midday heat
+        if (weather === 'sunny') heatRisk += 15;
+        if (weather === 'wind') heatRisk -= 5;
+        heatRisk = Math.min(95, Math.max(0, heatRisk + (Math.random() - 0.5) * 2));
+
+        this.risks = { flood: floodRisk, storm: stormRisk, traffic: trafficRisk, heat: heatRisk };
+        this.updateUI();
+        this.checkAlerts();
+    },
+
+    updateUI() {
+        const setRisk = (id, val) => {
+            const el = document.getElementById(id + '-risk-val');
+            const bar = document.getElementById(id + '-risk-bar');
+            if (!el || !bar) return;
+            el.textContent = Math.round(val) + '%';
+            bar.style.width = val + '%';
+            el.className = 'risk-value ' + (val < 30 ? 'risk-low' : val < 60 ? 'risk-med' : 'risk-high');
+            bar.className = 'risk-bar-fill ' + (val < 30 ? 'fill-low' : val < 60 ? 'fill-med' : 'fill-high');
+        };
+        setRisk('flood', this.risks.flood);
+        setRisk('storm', this.risks.storm);
+        setRisk('traffic', this.risks.traffic);
+        setRisk('heat', this.risks.heat);
+
+        // Update timeline predictions
+        const pred24h = document.getElementById('pred-24h');
+        const pred48h = document.getElementById('pred-48h');
+        const pred72h = document.getElementById('pred-72h');
+
+        if (this.risks.flood > 50) {
+            pred24h.textContent = 'Flood warning active';
+            pred48h.textContent = 'Severe flooding expected';
+            pred72h.textContent = 'Critical: Evacuate coastal zones';
+        } else if (this.risks.storm > 40) {
+            pred24h.textContent = 'Storm approaching';
+            pred48h.textContent = 'High winds expected';
+            pred72h.textContent = 'Storm surge warning';
+        } else {
+            pred24h.textContent = 'Low risk period';
+            pred48h.textContent = 'Moderate tide expected';
+            pred72h.textContent = 'No significant threats';
+        }
+    },
+
+    checkAlerts() {
+        const banner = document.getElementById('alert-banner');
+        const badge = document.getElementById('alert-badge');
+        const alertText = document.getElementById('alert-text');
+
+        if (this.risks.flood > 60 || this.risks.storm > 60) {
+            banner.classList.add('show');
+            badge.classList.add('active');
+            if (this.risks.flood > this.risks.storm) {
+                alertText.textContent = 'DISASTER ALERT: Flood risk at ' + Math.round(this.risks.flood) + '%';
+            } else {
+                alertText.textContent = 'DISASTER ALERT: Storm risk at ' + Math.round(this.risks.storm) + '%';
+            }
+        } else {
+            banner.classList.remove('show');
+            badge.classList.remove('active');
+        }
+    }
+};
+
+// ============================================================
+// PHASE 2: LIVE WEATHER API MODULE
+// ============================================================
+const WeatherAPI = {
+    async fetchLiveWeather() {
+        try {
+            // Open-Meteo API for a coastal city location (approximate)
+            const lat = 36.8; // Example coastal latitude
+            const lon = -76.3; // Example coastal longitude
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&hourly=weathercode`;
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.current_weather) {
+                const code = data.current_weather.weathercode;
+                const weatherMap = this.mapWeatherCode(code);
+
+                // Auto-switch weather if enabled
+                if (state.liveWeather && weatherMap !== state.weather) {
+                    state.weather = weatherMap;
+                    document.querySelectorAll('.weather-btn').forEach(b => b.classList.remove('active'));
+                    const btn = document.querySelector('[data-weather="' + weatherMap + '"]');
+                    if (btn) btn.classList.add('active');
+                    updateWeather(weatherMap);
+                    document.getElementById('stat-weather').textContent = weatherMap.charAt(0).toUpperCase() + weatherMap.slice(1);
+                }
+
+                document.getElementById('last-sync').textContent = new Date().toLocaleTimeString();
+            }
+        } catch (e) {
+            console.log('Weather API fetch failed (expected in sandbox):', e.message);
+            document.getElementById('last-sync').textContent = 'Offline';
+        }
+    },
+
+    mapWeatherCode(code) {
+        // WMO Weather interpretation codes
+        if (code === 0) return 'sunny';
+        if (code === 1 || code === 2 || code === 3) return 'cloudy';
+        if (code >= 51 && code <= 67) return 'rain';
+        if (code >= 71 && code <= 77) return 'rain'; // Snow mapped to rain for this demo
+        if (code >= 80 && code <= 82) return 'rain';
+        if (code >= 95 && code <= 99) return 'storm';
+        if (code === 45 || code === 48) return 'fog';
+        return 'sunny';
+    }
+};
+
+// ============================================================
+// PHASE 2: DIGITAL TWIN ANALYTICS
+// ============================================================
+const Analytics = {
+    metrics: { population: 142580, traffic: 8420, energy: 234, aqi: 42 },
+
+    update() {
+        // Simulate real-time metric changes
+        const time = state.time;
+        const weather = state.weather;
+
+        // Population varies by time
+        let pop = 120000;
+        if (time > 7 && time < 10) pop += 30000; // Commuters
+        if (time > 11 && time < 14) pop += 45000; // Lunch/shopping
+        if (time > 17 && time < 20) pop += 35000; // Evening
+        if (time > 22 || time < 5) pop -= 40000; // Night
+        this.metrics.population = Math.floor(pop + (Math.random() - 0.5) * 2000);
+
+        // Traffic
+        let traffic = 5000;
+        if (time > 7 && time < 9) traffic += 6000;
+        if (time > 17 && time < 19) traffic += 5500;
+        if (weather === 'rain') traffic += 1000;
+        if (state.floodLevel > 2) traffic -= 3000;
+        this.metrics.traffic = Math.floor(traffic + (Math.random() - 0.5) * 500);
+
+        // Energy
+        let energy = 180;
+        if (time > 8 && time < 18) energy += 80; // Daytime usage
+        if (time > 18 || time < 6) energy += 120; // Night lighting
+        if (weather === 'storm') energy += 30;
+        this.metrics.energy = Math.floor(energy + (Math.random() - 0.5) * 10);
+
+        // Air Quality Index
+        let aqi = 35;
+        if (traffic > 8000) aqi += 20;
+        if (weather === 'fog') aqi += 15;
+        if (weather === 'storm') aqi -= 10;
+        if (state.fireSimulation) aqi += 80;
+        this.metrics.aqi = Math.floor(aqi + (Math.random() - 0.5) * 5);
+
+        this.updateUI();
+    },
+
+    updateUI() {
+        document.getElementById('metric-pop').textContent = this.metrics.population.toLocaleString();
+        document.getElementById('metric-traffic').textContent = this.metrics.traffic.toLocaleString();
+        document.getElementById('metric-energy').textContent = this.metrics.energy + ' MW';
+        document.getElementById('metric-aqi').textContent = 'AQI ' + this.metrics.aqi;
+    }
+};
+
+// ============================================================
+// PHASE 2: AI ASSISTANT
+// ============================================================
+const AIAssistant = {
+    messages: [],
+
+    sendMessage(text) {
+        const container = document.getElementById('ai-chat-messages');
+
+        // User message
+        const userMsg = document.createElement('div');
+        userMsg.className = 'ai-message user';
+        userMsg.textContent = text;
+        container.appendChild(userMsg);
+        container.scrollTop = container.scrollHeight;
+
+        // Generate response
+        setTimeout(() => {
+            const response = this.generateResponse(text);
+            const botMsg = document.createElement('div');
+            botMsg.className = 'ai-message bot';
+            botMsg.textContent = response;
+            container.appendChild(botMsg);
+            container.scrollTop = container.scrollHeight;
+        }, 600 + Math.random() * 400);
+    },
+
+    generateResponse(input) {
+        const lower = input.toLowerCase();
+
+        if (lower.includes('flood') || lower.includes('water')) {
+            const risk = AIPrediction.risks.flood;
+            return `Current flood risk is ${Math.round(risk)}%. ${risk > 50 ? 'I recommend activating evacuation routes and monitoring tide levels closely.' : 'Conditions are stable. The coastal barriers are functioning normally.'}`;
+        }
+        if (lower.includes('storm') || lower.includes('weather')) {
+            const risk = AIPrediction.risks.storm;
+            return `Storm risk is at ${Math.round(risk)}%. ${risk > 40 ? 'A storm system is developing. I suggest securing harbor vessels and preparing emergency services.' : 'Weather patterns indicate calm conditions.'}`;
+        }
+        if (lower.includes('traffic')) {
+            return `Current traffic flow is ${Analytics.metrics.traffic.toLocaleString()} vehicles. ${Analytics.metrics.traffic > 10000 ? 'Congestion detected on main arteries. Consider route optimization.' : 'Traffic is flowing smoothly across the city.'}`;
+        }
+        if (lower.includes('population') || lower.includes('people')) {
+            return `The city currently has approximately ${Analytics.metrics.population.toLocaleString()} active residents. Peak hours see up to 180,000 people in the downtown area.`;
+        }
+        if (lower.includes('energy') || lower.includes('power')) {
+            return `Energy consumption is at ${Analytics.metrics.energy} MW. The grid is operating at ${Analytics.metrics.energy > 250 ? 'high' : 'normal'} capacity. Renewable sources contribute 34% of current demand.`;
+        }
+        if (lower.includes('air') || lower.includes('quality') || lower.includes('aqi')) {
+            const aqi = Analytics.metrics.aqi;
+            return `Air Quality Index is ${aqi}. ${aqi < 50 ? 'Air quality is good. No health concerns.' : aqi < 100 ? 'Moderate air quality. Sensitive individuals should limit outdoor activity.' : 'Poor air quality detected. Advisory issued for vulnerable populations.'}`;
+        }
+        if (lower.includes('disaster') || lower.includes('emergency')) {
+            const maxRisk = Math.max(AIPrediction.risks.flood, AIPrediction.risks.storm, AIPrediction.risks.traffic);
+            return `Monitoring ${maxRisk > 50 ? 'active disaster conditions' : 'normal operations'}. My prediction models show ${AIPrediction.risks.flood > 50 ? 'flood' : AIPrediction.risks.storm > 50 ? 'storm' : 'no immediate'} threats. Emergency response units are on standby.`;
+        }
+        if (lower.includes('hello') || lower.includes('hi')) {
+            return 'Hello! I am monitoring the city in real-time. I can provide insights on weather, traffic, energy, air quality, and disaster predictions. What would you like to know?';
+        }
+        if (lower.includes('help')) {
+            return 'I can help you with: weather forecasts, flood/storm predictions, traffic analysis, population statistics, energy grid status, air quality reports, and emergency planning. Just ask!';
+        }
+
+        return `I've analyzed your query against current city data. At ${Math.floor(state.time)}:00 with ${state.weather} conditions, the city is operating ${AIPrediction.risks.flood < 30 && AIPrediction.risks.storm < 30 ? 'normally' : 'under elevated alert'}. Is there a specific metric you'd like me to elaborate on?`;
+    }
+};
+
+// ============================================================
+// UI EVENT HANDLERS
+// ============================================================
+// Time slider
+document.getElementById('time-slider').addEventListener('input', (e) => {
+    state.time = parseFloat(e.target.value);
+    state.autoTime = false;
+    document.getElementById('auto-time-toggle').classList.remove('active');
+    updateTimeDisplay();
+});
+
+function updateTimeDisplay() {
+    const hours = Math.floor(state.time);
+    const minutes = Math.floor((state.time % 1) * 60);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    const timeStr = displayHours + ':' + minutes.toString().padStart(2, '0') + ' ' + ampm;
+    document.getElementById('time-display').textContent = timeStr;
+    document.getElementById('stat-time').textContent = timeStr;
+
+    const labels = ['Midnight', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Sunset', 'Evening', 'Night'];
+    const labelIndex = Math.floor(state.time / 3);
+    document.getElementById('current-time-label').textContent = labels[Math.min(labelIndex, 7)];
+}
+
+// Weather buttons
+document.querySelectorAll('.weather-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.weather-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.weather = btn.dataset.weather;
+        document.getElementById('stat-weather').textContent = btn.dataset.weather.charAt(0).toUpperCase() + btn.dataset.weather.slice(1);
+        updateWeather(state.weather);
+    });
+});
+
+// Camera buttons
+document.querySelectorAll('.camera-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.camera-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        setCameraMode(btn.dataset.camera);
+    });
+});
+
+// Phase 1 toggles
+document.getElementById('auto-time-toggle').addEventListener('click', function() {
+    this.classList.toggle('active');
+    state.autoTime = this.classList.contains('active');
+});
+
+document.getElementById('traffic-toggle').addEventListener('click', function() {
+    this.classList.toggle('active');
+    state.trafficEnabled = this.classList.contains('active');
+});
+
+document.getElementById('pedestrians-toggle').addEventListener('click', function() {
+    this.classList.toggle('active');
+    state.pedestriansEnabled = this.classList.contains('active');
+});
+
+document.getElementById('sound-toggle').addEventListener('click', function() {
+    this.classList.toggle('active');
+    state.soundEnabled = this.classList.contains('active');
+});
+
+// Quality slider
+document.getElementById('quality-slider').addEventListener('input', (e) => {
+    state.quality = parseInt(e.target.value);
+    const pixelRatios = [0.5, 0.75, 1, 1.5, 2];
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatios[state.quality - 1]));
+});
+
+// Photo mode
+document.getElementById('photo-mode-btn').addEventListener('click', () => {
+    state.photoMode = true;
+    document.getElementById('photo-mode-overlay').classList.add('active');
+    document.getElementById('ui-overlay').style.opacity = '0';
+    document.getElementById('ui-overlay').style.pointerEvents = 'none';
+});
+
+document.getElementById('photo-exit').addEventListener('click', () => {
+    state.photoMode = false;
+    document.getElementById('photo-mode-overlay').classList.remove('active');
+    document.getElementById('ui-overlay').style.opacity = '1';
+    document.getElementById('ui-overlay').style.pointerEvents = 'auto';
+});
+
+document.getElementById('photo-capture').addEventListener('click', () => {
+    renderer.render(scene, camera);
+    const link = document.createElement('a');
+    link.download = 'coastal-city-' + Date.now() + '.png';
+    link.href = renderer.domElement.toDataURL('image/png');
+    link.click();
+});
+
+// Reset
+document.getElementById('reset-btn').addEventListener('click', () => {
+    state.time = 12;
+    state.weather = 'sunny';
+    state.cameraMode = 'orbit';
+    state.floodLevel = 0;
+    state.earthquakeIntensity = 0;
+    state.fireSimulation = false;
+    state.autoFlood = false;
+    state.showEvacuation = false;
+    state.satelliteOverlay = false;
+    state.heatMap = false;
+
+    document.getElementById('time-slider').value = 12;
+    document.getElementById('flood-slider').value = 0;
+    document.getElementById('earthquake-slider').value = 0;
+    document.querySelectorAll('.weather-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-weather="sunny"]').classList.add('active');
+    document.querySelectorAll('.camera-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector('[data-camera="orbit"]').classList.add('active');
+    document.getElementById('evac-toggle').classList.remove('active');
+    document.getElementById('auto-flood-toggle').classList.remove('active');
+    document.getElementById('satellite-toggle').classList.remove('active');
+    document.getElementById('heatmap-toggle').classList.remove('active');
+
+    setCameraMode('orbit');
+    updateTimeDisplay();
+    updateWeather('sunny');
+    updateFloodSimulation();
+    updateEarthquake();
+    updateFireSimulation();
+});
+
+// Fullscreen
+document.getElementById('fullscreen-btn').addEventListener('click', () => {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+    } else {
+        document.exitFullscreen();
+    }
+});
+
+// ============================================================
+// PHASE 2: UI EVENT HANDLERS
+// ============================================================
+// Flood slider
+document.getElementById('flood-slider').addEventListener('input', (e) => {
+    state.floodLevel = parseFloat(e.target.value);
+    document.getElementById('flood-level-label').textContent = 'Water Level: ' + state.floodLevel.toFixed(1) + 'm';
+    updateFloodSimulation();
+});
+
+function updateFloodSimulation() {
+    if (state.floodLevel > 0) {
+        floodWater.visible = true;
+        floodWater.position.y = state.floodLevel - 2;
+        floodMaterial.opacity = Math.min(0.85, 0.4 + state.floodLevel * 0.02);
+    } else {
+        floodWater.visible = false;
+    }
+
+    // Buildings partially submerged effect
+    buildings.forEach((b, i) => {
+        const baseY = buildingOriginalPositions[i].y;
+        const submerged = state.floodLevel > baseY - b.children[0].geometry.parameters.height / 2;
+        if (submerged) {
+            b.children.forEach(child => {
+                if (child.material && child.material.emissive) {
+                    child.material.emissive.setHex(0x001133);
+                }
+            });
+        } else {
+            b.children.forEach(child => {
+                if (child.material && child.material.emissive && child.material.emissive.getHex() === 0x001133) {
+                    child.material.emissive.setHex(0x222244);
+                }
+            });
+        }
+    });
+}
+
+// Evacuation toggle
+document.getElementById('evac-toggle').addEventListener('click', function() {
+    this.classList.toggle('active');
+    state.showEvacuation = this.classList.contains('active');
+    evacuationRoutes.forEach(mat => {
+        mat.opacity = state.showEvacuation ? 0.8 : 0;
+    });
+});
+
+// Auto flood toggle
+document.getElementById('auto-flood-toggle').addEventListener('click', function() {
+    this.classList.toggle('active');
+    state.autoFlood = this.classList.contains('active');
+});
+
+// Earthquake slider
+document.getElementById('earthquake-slider').addEventListener('input', (e) => {
+    state.earthquakeIntensity = parseFloat(e.target.value);
+    document.getElementById('earthquake-label').textContent = 'Earthquake: ' + state.earthquakeIntensity.toFixed(1) + ' Richter';
+    updateEarthquake();
+});
+
+function updateEarthquake() {
+    // Camera shake intensity based on slider
+    // Applied in animation loop
+}
+
+// Fire simulation
+document.getElementById('fire-sim-btn').addEventListener('click', () => {
+    state.fireSimulation = !state.fireSimulation;
+    document.getElementById('fire-sim-btn').style.background = state.fireSimulation ? 'rgba(204,51,51,0.3)' : '';
+    updateFireSimulation();
+});
+
+function updateFireSimulation() {
+    fireSystems.forEach(sys => {
+        sys.visible = state.fireSimulation;
+    });
+}
+
+// Earthquake button
+document.getElementById('quake-sim-btn').addEventListener('click', () => {
+    state.earthquakeIntensity = 7.5;
+    document.getElementById('earthquake-slider').value = 7.5;
+    document.getElementById('earthquake-label').textContent = 'Earthquake: 7.5 Richter';
+
+    // Auto-reset after 5 seconds
+    setTimeout(() => {
+        state.earthquakeIntensity = 0;
+        document.getElementById('earthquake-slider').value = 0;
+        document.getElementById('earthquake-label').textContent = 'Earthquake: 0.0 Richter';
+    }, 5000);
+});
+
+// Live weather toggle
+document.getElementById('live-weather-toggle').addEventListener('click', function() {
+    this.classList.toggle('active');
+    state.liveWeather = this.classList.contains('active');
+    if (state.liveWeather) {
+        WeatherAPI.fetchLiveWeather();
+    }
+});
+
+// Satellite toggle
+document.getElementById('satellite-toggle').addEventListener('click', function() {
+    this.classList.toggle('active');
+    state.satelliteOverlay = this.classList.contains('active');
+    heatMapMesh.visible = state.satelliteOverlay;
+});
+
+// Heat map toggle
+document.getElementById('heatmap-toggle').addEventListener('click', function() {
+    this.classList.toggle('active');
+    state.heatMap = this.classList.contains('active');
+    heatMapMaterial.opacity = state.heatMap ? 0.6 : 0;
+});
+
+// AI Chat
+document.getElementById('ai-chat-toggle').addEventListener('click', () => {
+    document.getElementById('ai-chat-widget').classList.toggle('open');
+    document.getElementById('ai-chat-toggle').classList.toggle('hidden');
+});
+
+document.getElementById('ai-chat-send').addEventListener('click', () => {
+    const input = document.getElementById('ai-chat-input');
+    const text = input.value.trim();
+    if (text) {
+        AIAssistant.sendMessage(text);
+        input.value = '';
+    }
+});
+
+document.getElementById('ai-chat-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        document.getElementById('ai-chat-send').click();
+    }
+});
+
+// Close chat when clicking outside (simplified)
+document.addEventListener('click', (e) => {
+    const widget = document.getElementById('ai-chat-widget');
+    const toggle = document.getElementById('ai-chat-toggle');
+    if (!widget.contains(e.target) && !toggle.contains(e.target) && widget.classList.contains('open')) {
+        widget.classList.remove('open');
+        toggle.classList.remove('hidden');
+    }
+});
+
+// ============================================================
+// PHASE 2: 2D -> 3D RECONSTRUCTION & CAMERA
+// ============================================================
+let stream = null;
+const twinOverlay = document.getElementById('twin-capture-overlay');
+const twinVideo = document.getElementById('twin-video');
+const twinCanvas = document.getElementById('twin-canvas');
+const twinPlaceholder = document.getElementById('twin-placeholder');
+const twinSnapBtn = document.getElementById('twin-snap');
+const twinStartCamBtn = document.getElementById('twin-start-cam');
+
+document.getElementById('create-twin-btn').addEventListener('click', () => {
+    twinOverlay.classList.add('active');
+    document.getElementById('ui-overlay').style.opacity = '0';
+    document.getElementById('ui-overlay').style.pointerEvents = 'none';
+});
+
+document.getElementById('twin-exit').addEventListener('click', () => {
+    stopCamera();
+    twinOverlay.classList.remove('active');
+    document.getElementById('ui-overlay').style.opacity = '1';
+    document.getElementById('ui-overlay').style.pointerEvents = 'auto';
+    twinVideo.style.display = 'none';
+    twinCanvas.style.display = 'none';
+    twinPlaceholder.style.display = 'block';
+    twinSnapBtn.style.display = 'none';
+    twinStartCamBtn.style.display = 'block';
+});
+
+document.getElementById('twin-upload-btn').addEventListener('click', () => {
+    document.getElementById('twin-file-input').click();
+});
+
+document.getElementById('twin-file-input').addEventListener('change', (e) => {
+    if (e.target.files && e.target.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            const img = new Image();
+            img.onload = () => {
+                stopCamera();
+                twinVideo.style.display = 'none';
+                twinPlaceholder.style.display = 'none';
+                twinStartCamBtn.style.display = 'block';
+                
+                twinCanvas.style.display = 'block';
+                twinCanvas.width = img.width;
+                twinCanvas.height = img.height;
+                const ctx = twinCanvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                twinSnapBtn.style.display = 'block';
+                twinSnapBtn.textContent = 'Generate 3D City';
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    }
+});
+
+twinStartCamBtn.addEventListener('click', async () => {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        twinVideo.srcObject = stream;
+        twinVideo.style.display = 'block';
+        twinPlaceholder.style.display = 'none';
+        twinCanvas.style.display = 'none';
+        twinStartCamBtn.style.display = 'none';
+        twinSnapBtn.style.display = 'block';
+        twinSnapBtn.textContent = 'Snap & Generate';
+    } catch (err) {
+        alert("Camera access denied or unavailable.");
+    }
+});
+
+function stopCamera() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+}
+
+twinSnapBtn.addEventListener('click', async () => {
+    // Show progress
+    twinSnapBtn.textContent = 'Analyzing Image...';
+    twinSnapBtn.style.opacity = '0.5';
+    twinSnapBtn.style.pointerEvents = 'none';
+    
+    let base64Image = '';
+    
+    if (stream) {
+        // Grab from video
+        twinCanvas.width = twinVideo.videoWidth;
+        twinCanvas.height = twinVideo.videoHeight;
+        const ctx = twinCanvas.getContext('2d');
+        ctx.drawImage(twinVideo, 0, 0, twinCanvas.width, twinCanvas.height);
+        base64Image = twinCanvas.toDataURL('image/jpeg', 0.8);
+        stopCamera();
+        twinVideo.style.display = 'none';
+        twinCanvas.style.display = 'block';
+    } else {
+        // Grab from uploaded canvas
+        base64Image = twinCanvas.toDataURL('image/jpeg', 0.8);
+    }
+    
+    try {
+        const response = await fetch('http://localhost:8000/api/reconstruct', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: base64Image })
+        });
+        
+        if (!response.ok) throw new Error("Backend not responding");
+        const data = await response.json();
+        
+        // CLEAR EXISTING CITY
+        clearExistingCity();
+        
+        // GENERATE NEW CITY
+        twinSnapBtn.textContent = 'Building 3D Geometry...';
+        setTimeout(() => {
+            generateFromAPI(data.buildings, data.roads);
+            
+            // Exit overlay
+            document.getElementById('twin-exit').click();
+            
+            // Trigger Drone Flyover Demo
+            setTimeout(() => {
+                document.querySelector('[data-camera="drone"]').click();
+            }, 1000);
+            
+        }, 500);
+        
+    } catch (err) {
+        alert("Failed to connect to Python backend. Ensure uvicorn is running on port 8000.");
+        twinSnapBtn.textContent = 'Generate Failed';
+        setTimeout(() => {
+            twinSnapBtn.style.opacity = '1';
+            twinSnapBtn.style.pointerEvents = 'auto';
+            twinSnapBtn.textContent = 'Snap & Generate';
+        }, 2000);
+    }
+});
+
+function clearExistingCity() {
+    // Remove old buildings
+    buildings.forEach(b => scene.remove(b));
+    buildings.length = 0;
+    buildingOriginalPositions.length = 0;
+    buildingLights.length = 0;
+    
+    // We keep roads and ground as base, but we could clear them if we wanted.
+    // For this hackathon, we'll just clear buildings to demonstrate the dynamic 3D pop-up.
+}
+
+function generateFromAPI(apiBuildings, apiRoads) {
+    // Create new buildings procedurally from OpenCV/YOLO mock extraction
+    apiBuildings.forEach(bData => {
+        const { x, z, width, depth } = bData.polygon;
+        const height = bData.estimated_height;
+        const type = bData.type;
+        
+        // We use createBuilding since it handles geometry extrusions essentially
+        const b = createBuilding(x, z, width, depth, height, type);
+        
+        // Store API ID for prediction later
+        b.userData = { id: bData.id, elevation: bData.estimated_elevation };
+    });
+}
+
+// Auto Predict Toggle logic
+document.getElementById('auto-predict-toggle').addEventListener('click', function() {
+    this.classList.toggle('active');
+    if(this.classList.contains('active')) {
+        triggerMLPrediction();
+    }
+});
+
+async function triggerMLPrediction() {
+    const activeIds = buildings.filter(b => b.userData && b.userData.id).map(b => b.userData.id);
+    if(activeIds.length === 0) return;
+    
+    try {
+        const response = await fetch('http://localhost:8000/api/predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ flood_level: state.floodLevel, building_ids: activeIds })
+        });
+        const data = await response.json();
+        
+        // Visual feedback based on ML predictions
+        data.predictions.forEach(p => {
+            const b = buildings.find(b => b.userData && b.userData.id === p.id);
+            if(b) {
+                // If vulnerability is high, highlight red
+                if(p.prediction.vulnerability_score > 60) {
+                    b.children.forEach(child => {
+                        if (child.material && child.material.color) {
+                            child.material.color.setHex(0xff3333);
+                        }
+                    });
+                }
+            }
+        });
+    } catch(err) {
+        console.error("ML Prediction Failed:", err);
+    }
+}
+
+
+// ============================================================
+// LOADING SCREEN
+// ============================================================
+const loadingSteps = [
+    'Initializing AI neural networks...',
+    'Loading disaster prediction models...',
+    'Connecting to weather APIs...',
+    'Generating terrain...',
+    'Building cityscape...',
+    'Adding vegetation...',
+    'Setting up lighting...',
+    'Configuring weather systems...',
+    'Calibrating sensors...',
+    'Ready!'
+];
+
+let loadingProgress = 0;
+const loadingBar = document.getElementById('loading-bar');
+const loadingText = document.getElementById('loading-text');
+
+function updateLoading() {
+    loadingProgress += 1.5;
+    loadingBar.style.width = Math.min(loadingProgress, 100) + '%';
+    const stepIndex = Math.floor((loadingProgress / 100) * loadingSteps.length);
+    loadingText.textContent = loadingSteps[Math.min(stepIndex, loadingSteps.length - 1)];
+
+    if (loadingProgress < 100) {
+        setTimeout(updateLoading, 60);
+    } else {
+        setTimeout(() => {
+            document.getElementById('loading-screen').classList.add('fade-out');
+            document.getElementById('ui-overlay').style.opacity = '1';
+            playIntro();
+        }, 500);
+    }
+}
+
+updateLoading();
+
+// ============================================================
+// MAIN ANIMATION LOOP
+// ============================================================
+const clock = new THREE.Clock();
+let aiUpdateTimer = 0;
+let analyticsTimer = 0;
+let weatherApiTimer = 0;
+
+function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    const elapsed = clock.getElapsedTime();
+
+    // FPS counter
+    state.frameCount++;
+    const now = performance.now();
+    if (now - state.lastFpsTime >= 1000) {
+        state.fps = state.frameCount;
+        state.frameCount = 0;
+        state.lastFpsTime = now;
+        document.getElementById('fps-counter').textContent = state.fps + ' FPS';
+    }
+
+    // Auto time
+    if (state.autoTime) {
+        state.time += delta * 0.1;
+        if (state.time >= 24) state.time = 0;
+        document.getElementById('time-slider').value = state.time;
+        updateTimeDisplay();
+    }
+
+    updateDayNightCycle(state.time);
+
+    // Auto flood simulation
+    if (state.autoFlood) {
+        const targetLevel = state.weather === 'storm' ? 12 : state.weather === 'rain' ? 6 : 2;
+        state.floodLevel = THREE.MathUtils.lerp(state.floodLevel, targetLevel, delta * 0.1);
+        document.getElementById('flood-slider').value = state.floodLevel;
+        document.getElementById('flood-level-label').textContent = 'Water Level: ' + state.floodLevel.toFixed(1) + 'm';
+        updateFloodSimulation();
+    }
+
+    // AI Prediction updates (every 2 seconds)
+    aiUpdateTimer += delta;
+    if (aiUpdateTimer > 2) {
+        aiUpdateTimer = 0;
+        AIPrediction.update();
+    }
+
+    // Analytics updates (every 1 second)
+    analyticsTimer += delta;
+    if (analyticsTimer > 1) {
+        analyticsTimer = 0;
+        Analytics.update();
+    }
+
+    // Weather API sync (every 60 seconds)
+    if (state.liveWeather) {
+        weatherApiTimer += delta;
+        if (weatherApiTimer > 60) {
+            weatherApiTimer = 0;
+            WeatherAPI.fetchLiveWeather();
+        }
+    }
+
+    // Ocean waves
+    const oceanPos = ocean.geometry.attributes.position;
+    for (let i = 0; i < oceanPos.count; i++) {
+        const x = oceanOriginalPositions.getX(i);
+        const y = oceanOriginalPositions.getY(i);
+        const wave1 = Math.sin(x * 0.1 + elapsed * 1.5) * 0.5;
+        const wave2 = Math.sin(y * 0.15 + elapsed * 1.2) * 0.3;
+        const wave3 = Math.sin((x + y) * 0.08 + elapsed * 0.8) * 0.2;
+        oceanPos.setZ(i, wave1 + wave2 + wave3);
+    }
+    oceanPos.needsUpdate = true;
+    ocean.geometry.computeVertexNormals();
+
+    // Flood water animation
+    if (floodWater.visible) {
+        const floodPos = floodWater.geometry.attributes.position;
+        for (let i = 0; i < floodPos.count; i++) {
+            const x = floodPos.getX(i);
+            const y = floodPos.getY(i);
+            const wave = Math.sin(x * 0.05 + elapsed) * 0.2 + Math.sin(y * 0.03 + elapsed * 0.7) * 0.15;
+            floodPos.setZ(i, wave);
+        }
+        floodPos.needsUpdate = true;
+    }
+
+    // Boats
+    boats.forEach(boat => {
+        boat.mesh.position.x += Math.sin(elapsed * boat.speed) * 0.02;
+        boat.mesh.position.y = Math.sin(elapsed * 0.5 + boat.mesh.position.x * 0.1) * 0.3;
+        boat.mesh.rotation.z = Math.sin(elapsed * 0.3) * 0.05;
+    });
+
+    // Traffic
+    if (state.trafficEnabled) {
+        vehicles.forEach(vehicle => {
+            vehicle.mesh.position.x += vehicle.speed * vehicle.direction;
+            if (vehicle.mesh.position.x > 130) vehicle.mesh.position.x = -130;
+            if (vehicle.mesh.position.x < -130) vehicle.mesh.position.x = 130;
+        });
+    }
+
+    // Pedestrians
+    if (state.pedestriansEnabled) {
+        pedestrians.forEach(ped => {
+            ped.mesh.position.x += ped.direction.x * ped.speed;
+            ped.mesh.position.z += ped.direction.z * ped.speed;
+            ped.mesh.position.y = Math.abs(Math.sin(elapsed * 5 + ped.walkOffset)) * 0.1;
+
+            if (Math.abs(ped.mesh.position.x) > 80 || Math.abs(ped.mesh.position.z) > 80) {
+                ped.direction.negate();
+            }
+        });
+    }
+
+    // Clouds
+    clouds.forEach(cloud => {
+        cloud.mesh.position.x += cloud.speed;
+        if (cloud.mesh.position.x > 200) cloud.mesh.position.x = -200;
+    });
+
+    // Trees sway
+    trees.forEach(tree => {
+        const windStrength = state.weather === 'wind' || state.weather === 'storm' ? 0.15 : 0.03;
+        const sway = Math.sin(elapsed * 1.5 + tree.mesh.position.x) * windStrength;
+        tree.mesh.rotation.z = sway;
+        tree.mesh.rotation.x = sway * 0.5;
+    });
+
+    // Lighthouse rotation
+    lighthouseGroup.rotation.y += 0.01;
+    beam.rotation.y += 0.01;
+
+    // Birds
+    birds.forEach(bird => {
+        bird.angle += bird.speed;
+        bird.mesh.position.x = bird.center.x + Math.cos(bird.angle) * bird.radius;
+        bird.mesh.position.z = bird.center.z + Math.sin(bird.angle) * bird.radius;
+        bird.mesh.position.y = bird.height + Math.sin(elapsed * 2 + bird.angle) * 2;
+        bird.mesh.rotation.y = -bird.angle + Math.PI / 2;
+
+        const wing = bird.mesh.children[1];
+        if (wing) wing.rotation.x = Math.sin(elapsed * 10) * 0.5;
+    });
+
+    // Fountain particles
+    fountainParticles.forEach(particle => {
+        particle.mesh.position.add(particle.velocity);
+        particle.velocity.y -= 0.005;
+        particle.life--;
+
+        if (particle.life <= 0 || particle.mesh.position.y < 0.5) {
+            particle.mesh.position.set(0, 3, 50);
+            particle.velocity.set(
+                (Math.random()-0.5)*0.3,
+                0.1 + Math.random()*0.2,
+                (Math.random()-0.5)*0.3
+            );
+            particle.life = 50 + Math.random() * 50;
+        }
+    });
+
+    // Ferris wheel
+    ferrisGroup.children.forEach((child, index) => {
+        if (index > 1) {
+            const angle = elapsed * 0.1 + (index - 2) * (Math.PI * 2 / 12);
+            child.position.x = Math.cos(angle) * 10;
+            child.position.y = 15 + Math.sin(angle) * 10;
+        }
+    });
+
+    // Traffic lights
+    trafficLights.forEach(tl => {
+        tl.timer++;
+        if (tl.timer > 300) {
+            tl.timer = 0;
+            tl.state = (tl.state + 1) % 3;
+        }
+        tl.redMat.emissiveIntensity = tl.state === 0 ? 1 : 0.1;
+        tl.yellowMat.emissiveIntensity = tl.state === 1 ? 1 : 0.1;
+        tl.greenMat.emissiveIntensity = tl.state === 2 ? 1 : 0.1;
+    });
+
+    // Rain
+    if (state.weather === 'rain' || state.weather === 'storm') {
+        const rainPos = rain.geometry.attributes.position;
+        for (let i = 0; i < rainCount * 3; i += 3) {
+            rainPos.array[i+1] -= 2;
+            if (rainPos.array[i+1] < 0) {
+                rainPos.array[i+1] = 100 + Math.random() * 100;
+            }
+        }
+        rainPos.needsUpdate = true;
+    }
+
+    // Lightning
+    if (state.weather === 'storm' && Math.random() < 0.01) {
+        sunLight.intensity = 3;
+        setTimeout(() => { sunLight.intensity = 0; }, 100);
+    }
+
+    // Earthquake camera shake
+    if (state.earthquakeIntensity > 0) {
+        const shake = state.earthquakeIntensity * 0.02;
+        camera.position.x += (Math.random() - 0.5) * shake;
+        camera.position.y += (Math.random() - 0.5) * shake;
+        camera.position.z += (Math.random() - 0.5) * shake;
+
+        // Building sway
+        buildings.forEach((b, i) => {
+            const swayAmount = state.earthquakeIntensity * 0.005;
+            b.rotation.z = Math.sin(elapsed * 3 + i) * swayAmount;
+            b.rotation.x = Math.cos(elapsed * 2.5 + i) * swayAmount * 0.5;
+        });
+    } else {
+        // Reset building rotations
+        buildings.forEach(b => {
+            b.rotation.z = THREE.MathUtils.lerp(b.rotation.z, 0, 0.1);
+            b.rotation.x = THREE.MathUtils.lerp(b.rotation.x, 0, 0.1);
+        });
+    }
+
+    // Fire animation
+    if (state.fireSimulation) {
+        fireParticles.forEach(p => {
+            p.mesh.position.y += p.speed;
+            p.mesh.scale.setScalar(1 + Math.sin(elapsed * 5) * 0.3);
+            p.mat.opacity = 0.5 + Math.sin(elapsed * 8) * 0.3;
+            if (p.mesh.position.y > p.baseY + 3) {
+                p.mesh.position.y = p.baseY;
+            }
+        });
+
+        smokeParticles.forEach(p => {
+            p.mesh.position.y += p.speed;
+            p.mesh.position.x += Math.sin(elapsed + p.mesh.position.y) * 0.01;
+            p.mat.opacity = Math.max(0, 0.4 - (p.mesh.position.y - p.baseY) * 0.05);
+            if (p.mesh.position.y > p.baseY + 8) {
+                p.mesh.position.y = p.baseY;
+                p.mat.opacity = 0.4;
+            }
+        });
+    }
+
+    // Evacuation route pulse
+    if (state.showEvacuation) {
+        evacuationRoutes.forEach(mat => {
+            mat.emissiveIntensity = 0.5 + Math.sin(elapsed * 3) * 0.5;
+        });
+    }
+
+    // Mini globe rotation
+    globe.rotation.y += 0.002;
+    land.rotation.y += 0.002;
+    globeRenderer.render(globeScene, globeCamera);
+
+    controls.update();
+    composer.render();
+}
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
+});
+
+const totalObjects = scene.children.length + buildings.length + vehicles.length + pedestrians.length + trees.length + boats.length + clouds.length + birds.length + streetLights.length + trafficLights.length;
+document.getElementById('stat-objects').textContent = totalObjects;
+
+animate();
+</script>
+</body>
+</html>
