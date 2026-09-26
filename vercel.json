@@ -1,9 +1,18 @@
-﻿{
+{
   "version": 2,
   "cleanUrls": true,
   "rewrites": [
-    { "source": "/", "destination": "/index.html" },
-    { "source": "/phase3", "destination": "/coastal_city_phase3.html" },
-    { "source": "/phase2", "destination": "/coastal_city_phase2.html" }
+    {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/phase3",
+      "destination": "/coastal_city_phase3.html"
+    },
+    {
+      "source": "/phase2",
+      "destination": "/coastal_city_phase2.html"
+    }
   ]
 }
