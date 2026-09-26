@@ -760,56 +760,65 @@ function createBuilding(x, z, width, depth, height, type) {
 }
 
 function generateCity() {
-    function isRoad(x, z) {
-        if (Math.abs(x) < 15) return true; // Main NS road
-        if (Math.abs(z) < 15) return true; // Main EW road
-        if (Math.abs(z + 30) < 10) return true; // Beach road
-        if (Math.abs(x - 60) < 10) return true; // East NS road
-        if (Math.abs(x + 60) < 10) return true; // West NS road
-        if (Math.abs(z - 40) < 10) return true; // North EW road 1
-        if (Math.abs(z - 80) < 10) return true; // North EW road 2
-        return false;
-    }
-    
-    let attempts = 0;
-    let placed = 0;
-    while(placed < 12 && attempts < 100) {
-        const x = (Math.random() - 0.5) * 80;
-        const z = (Math.random() - 0.5) * 60 + 20;
-        attempts++;
-        if (isRoad(x, z)) continue;
-        createBuilding(x, z, 8 + Math.random() * 6, 8 + Math.random() * 6, 40 + Math.random() * 60, 'skyscraper');
-        placed++;
-    }
-    placed = 0; attempts = 0;
-    while(placed < 20 && attempts < 200) {
-        const x = (Math.random() - 0.5) * 120;
-        const z = (Math.random() - 0.5) * 80 + 40;
-        attempts++;
-        if (isRoad(x, z)) continue;
-        createBuilding(x, z, 10 + Math.random() * 8, 10 + Math.random() * 8, 15 + Math.random() * 25, 'modern');
-        placed++;
-    }
-    placed = 0; attempts = 0;
-    while(placed < 25 && attempts < 200) {
-        const x = (Math.random() - 0.5) * 140;
-        const z = (Math.random() - 0.5) * 60 + 80;
-        attempts++;
-        if (isRoad(x, z)) continue;
-        createBuilding(x, z, 8 + Math.random() * 6, 8 + Math.random() * 6, 8 + Math.random() * 15, 'residential');
-        placed++;
-    }
-    
-    // Fixed landmarks, check manual offsets so they don't clip
-    if(!isRoad(-60, -15)) createBuilding(-60, -15, 20, 15, 25, 'modern');
-    if(!isRoad(-20, -15)) createBuilding(-20, -15, 20, 15, 25, 'modern');
-    if(!isRoad(20, -15)) createBuilding(20, -15, 20, 15, 25, 'modern');
-    if(!isRoad(60, -15)) createBuilding(60, -15, 20, 15, 25, 'modern');
-    
-    if(!isRoad(30, 60)) createBuilding(30, 60, 35, 25, 8, 'modern');
-    if(!isRoad(-50, 70)) createBuilding(-50, 70, 20, 20, 12, 'modern');
-    if(!isRoad(-70, 50)) createBuilding(-70, 50, 12, 10, 6, 'modern');
-    if(!isRoad(60, 50)) createBuilding(60, 50, 12, 10, 6, 'modern');
+    // Deterministic grid-based city layout
+    // Roads (with 4-unit safety buffer beyond actual half-width):
+    //   Main N-S: x in [-15,15]   Main E-W: z in [-15,15]
+    //   Beach:    z in [-37,-23]  East NS: x in [52,68]  West NS: x in [-68,-52]
+    //   EW1:      z in [33,47]    EW2:     z in [73,87]
+
+    // SKYSCRAPERS - downtown core blocks
+    [
+        {x:-44,z:24,w:10,d: 9,h:68,t:'skyscraper'},
+        {x:-30,z:22,w: 8,d: 8,h:82,t:'skyscraper'},
+        {x:-20,z:28,w: 7,d: 8,h:58,t:'skyscraper'},
+        {x: 20,z:22,w: 9,d: 8,h:75,t:'skyscraper'},
+        {x: 34,z:25,w: 8,d: 9,h:92,t:'skyscraper'},
+        {x: 46,z:28,w: 7,d: 7,h:62,t:'skyscraper'},
+        {x:-36,z:28,w: 8,d: 8,h:55,t:'skyscraper'},
+        {x: 28,z:28,w: 8,d: 8,h:70,t:'skyscraper'},
+    ].forEach(b=>createBuilding(b.x,b.z,b.w,b.d,b.h,b.t));
+
+    // MODERN - midtown, south of main road, and second tier
+    [
+        {x:-46,z:-22,w:12,d:10,h:24,t:'modern'},
+        {x:-30,z:-20,w:10,d:10,h:32,t:'modern'},
+        {x:-19,z:-22,w: 9,d: 9,h:20,t:'modern'},
+        {x: 19,z:-22,w: 9,d: 9,h:24,t:'modern'},
+        {x: 32,z:-20,w:10,d:10,h:30,t:'modern'},
+        {x: 46,z:-22,w:12,d:10,h:22,t:'modern'},
+        {x:-44,z:55,w:14,d:12,h:20,t:'modern'},
+        {x:-28,z:60,w:10,d:10,h:28,t:'modern'},
+        {x:-19,z:53,w: 9,d: 9,h:22,t:'modern'},
+        {x:-38,z:68,w:10,d: 9,h:16,t:'modern'},
+        {x: 20,z:55,w:10,d:10,h:22,t:'modern'},
+        {x: 34,z:60,w:12,d:12,h:30,t:'modern'},
+        {x: 46,z:68,w: 9,d: 9,h:18,t:'modern'},
+        {x: 22,z:70,w: 9,d: 9,h:20,t:'modern'},
+        {x:-80,z:22,w:10,d: 9,h:14,t:'modern'},
+        {x: 95,z:22,w: 9,d: 8,h:12,t:'modern'},
+    ].forEach(b=>createBuilding(b.x,b.z,b.w,b.d,b.h,b.t));
+
+    // RESIDENTIAL - outer districts
+    [
+        {x:-44,z: 95,w: 9,d: 8,h:12,t:'residential'},
+        {x:-30,z: 92,w: 8,d: 8,h: 9,t:'residential'},
+        {x:-20,z:100,w: 8,d: 8,h:14,t:'residential'},
+        {x:-40,z:108,w: 9,d: 8,h:10,t:'residential'},
+        {x:-24,z:112,w: 8,d: 7,h: 8,t:'residential'},
+        {x: 20,z: 92,w: 9,d: 8,h:12,t:'residential'},
+        {x: 34,z: 96,w: 8,d: 8,h: 9,t:'residential'},
+        {x: 46,z:100,w: 8,d: 8,h:14,t:'residential'},
+        {x: 22,z:110,w: 9,d: 8,h:10,t:'residential'},
+        {x: 40,z:112,w: 8,d: 7,h: 8,t:'residential'},
+        {x:-92,z: 55,w: 9,d: 8,h: 8,t:'residential'},
+        {x:-78,z: 72,w: 8,d: 8,h:12,t:'residential'},
+        {x:-95,z: 90,w: 9,d: 9,h: 9,t:'residential'},
+        {x:-80,z:105,w: 8,d: 8,h: 8,t:'residential'},
+        {x: 75,z: 55,w:10,d: 9,h:10,t:'residential'},
+        {x: 78,z: 72,w: 8,d: 8,h:12,t:'residential'},
+        {x:100,z: 90,w: 9,d: 9,h: 9,t:'residential'},
+        {x: 78,z:105,w: 8,d: 8,h: 8,t:'residential'},
+    ].forEach(b=>createBuilding(b.x,b.z,b.w,b.d,b.h,b.t));
 }
 
 generateCity();
@@ -912,20 +921,79 @@ function createTree(x, z, scale, type) {
     return group;
 }
 
-for (let i = -90; i <= 90; i += 15) {
-    if (Math.abs(i) < 10) continue;
-    createTree(i, 12, 0.8 + Math.random() * 0.4);
-    createTree(i, -12, 0.8 + Math.random() * 0.4);
-}
-for (let i = 0; i < 30; i++) {
-    const x = (Math.random() - 0.5) * 60;
-    const z = 60 + Math.random() * 40;
-    createTree(x, z, 0.7 + Math.random() * 0.5);
-}
-for (let i = -90; i <= 90; i += 12) {
-    createTree(i, -35, 1.2, 'palm');
-    createTree(i + 6, -38, 1.0, 'palm');
-}
+// ═══════════════════════════════════════════════════════════════
+// TREES — 100% HARDCODED POSITIONS, ZERO RANDOMNESS IN PLACEMENT
+// Road map (all half-widths + 4-unit safety buffer):
+//   N-S road:   x ∈ [-12, 12]   → trees at x ≤ -20 or x ≥ 20
+//   E-W road:   z ∈ [-12, 12]   → trees at z ≤ -20 or z ≥ 20
+//   Beach road: z ∈ [-34, -26]  → no trees z ∈ [-38, -22]
+//   East N-S:   x ∈ [55, 67]    → no trees x ∈ [51, 71]
+//   West N-S:   x ∈ [-67,-55]   → no trees x ∈ [-71,-51]
+//   North EW1:  z ∈ [34, 46]    → no trees z ∈ [30, 50]
+//   North EW2:  z ∈ [75, 85]    → no trees z ∈ [71, 89]
+// ═══════════════════════════════════════════════════════════════
+
+// ── 1. NORTH VERGE of E-W road — z=20, safe x positions only ──
+// Skip x ∈ [-12,12] (N-S road), x ∈ [51,71] (East NS), x ∈ [-71,-51] (West NS)
+[
+  -90, -75, -58, -42, -28,   // west of N-S road
+   28,  42,  58,  75,  90    // east of N-S road
+].forEach(x => createTree(x, 20, 0.8 + Math.random()*0.3));
+
+// ── 2. SOUTH VERGE of E-W road — z=-20 ──
+[
+  -90, -75, -58, -42, -28,
+   28,  42,  58,  75,  90
+].forEach(x => createTree(x, -20, 0.8 + Math.random()*0.3));
+
+// ── 3. EAST VERGE of N-S road — x=20, safe z positions only ──
+// Skip z ∈ [-12,12] (E-W road), z ∈ [30,50] (North EW1), z ∈ [71,89] (North EW2), z ∈ [-38,-22] (beach road)
+[
+  -65, -50,            // south of E-W road (above beach road)
+   20,  55, 65,        // north of E-W road, below North EW1
+   52, 60,             // between EW1 and EW2
+   92, 105             // north of EW2
+].forEach(z => createTree(20, z, 0.8 + Math.random()*0.3));
+
+// ── 4. WEST VERGE of N-S road — x=-20 ──
+[
+  -65, -50,
+   20,  55, 65,
+   52, 60,
+   92, 105
+].forEach(z => createTree(-20, z, 0.8 + Math.random()*0.3));
+
+// ── 5. PARK TREES — around fountain at (0, 50), inside park z=65..100 ──
+// Fountain is at z=50, park benches ring at radius=14, trees at r=22 ring
+[
+  [ 22, 50], [-22, 50], [  0, 72], [  0, 28],
+  [ 16, 68], [-16, 68], [ 16, 32], [-16, 32],
+  [ 30, 65], [-30, 65], [ 30, 35], [-30, 35],
+  [ 38, 50], [-38, 50],
+  [ 20, 78], [-20, 78], [ 20, 92], [-20, 92],
+  [  8, 85], [ -8, 85], [  8, 98], [ -8, 98],
+  [ 35, 85], [-35, 85], [ 35, 95], [-35, 95],
+].forEach(([x,z]) => createTree(x, z, 0.75 + Math.random()*0.4));
+
+// ── 6. BEACH PALM TREES — z=-45 (well clear of beach road at z=-30±6=-36..-24) ──
+[-90,-76,-62,-48,-34,-20, 20, 34, 48, 62, 76, 90]
+  .forEach(x => createTree(x, -45, 1.1 + Math.random()*0.3, 'palm'));
+[-84,-70,-56,-42, 42, 56, 70, 84]
+  .forEach(x => createTree(x, -50, 0.9 + Math.random()*0.25, 'palm'));
+
+// ── 7. WEST CITY DISTRICT — x ∈ [-110,-72], z ∈ [-15..115] (far from roads) ──
+[
+  [-85, -5], [-95,  15], [-82,  28], [-100,  55],
+  [-85,  52], [-95,  68], [-80,  70], [-100,  90],
+  [-88, 100], [-75, 108], [-105,  10], [-92,  35],
+].forEach(([x,z]) => createTree(x, z, 0.75 + Math.random()*0.4));
+
+// ── 8. EAST CITY DISTRICT — x ∈ [72..110], z ∈ [52..110] (away from Ferris at 85,20) ──
+[
+  [ 80,  55], [ 95,  60], [ 75,  70], [105,  72],
+  [ 85,  85], [ 95,  90], [ 78, 100], [108,  95],
+  [ 80, 108], [ 95, 108],
+].forEach(([x,z]) => createTree(x, z, 0.75 + Math.random()*0.4));
 
 // LIGHTHOUSE
 const lighthouseGroup = new THREE.Group();
@@ -1156,19 +1224,49 @@ function createVehicle(type, lane) {
     return group;
 }
 
-for (let i = 0; i < 20; i++) {
-    const lane = i % 4;
-    const x = -100 + (Math.floor(i / 4) * 40);
-    const z = [4, -4, -26, -34][lane];
-    const direction = lane % 2 === 0 ? 1 : -1;
-    const v = createVehicle(['car','car','taxi','bus'][Math.floor(Math.random()*4)], lane);
-    v.position.set(x, 0, z);
-    if (direction === 1) {
-        v.rotation.y = Math.PI / 2;
-    } else {
-        v.rotation.y = -Math.PI / 2;
+//  ROAD LANE DEFINITIONS 
+// Each lane is locked to a specific X or Z coordinate matching the actual roads
+const roadLanes = [
+    // E-W roads (Main road z=0, Beach road z=-30, North roads z=40, z=80)
+    { axis:'EW', z:  4, dir:  1 },   // Main EW  eastbound
+    { axis:'EW', z: -4, dir: -1 },   // Main EW  westbound
+    { axis:'EW', z:-26, dir:  1 },   // Beach road  eastbound
+    { axis:'EW', z:-34, dir: -1 },   // Beach road  westbound
+    { axis:'EW', z: 36, dir:  1 },   // North EW 1  eastbound
+    { axis:'EW', z: 44, dir: -1 },   // North EW 1  westbound
+    { axis:'EW', z: 76, dir:  1 },   // North EW 2  eastbound
+    { axis:'EW', z: 84, dir: -1 },   // North EW 2  westbound
+    // N-S roads (Main NS x=0, East x=60, West x=-60)
+    { axis:'NS', x:  3, dir:  1 },   // Main NS  northbound
+    { axis:'NS', x: -3, dir: -1 },   // Main NS  southbound
+    { axis:'NS', x: 57, dir:  1 },   // East NS   northbound
+    { axis:'NS', x: 63, dir: -1 },   // East NS   southbound
+    { axis:'NS', x:-57, dir:  1 },   // West NS   northbound
+    { axis:'NS', x:-63, dir: -1 },   // West NS   southbound
+];
+
+const vTypes = ['car','car','car','taxi','bus','car','car','taxi'];
+
+roadLanes.forEach((lane, li) => {
+    const count = (lane.axis === 'EW') ? 6 : 4;
+    for (let i = 0; i < count; i++) {
+        const type = vTypes[(li + i) % vTypes.length];
+        const v = createVehicle(type, li);
+
+        if (lane.axis === 'EW') {
+            // Start spread across the E-W road
+            v.position.set(-120 + i * 40 + Math.random() * 20, 0, lane.z);
+            v.rotation.y = lane.dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+        } else {
+            // Start spread across the N-S road
+            v.position.set(lane.x, 0, -80 + i * 35 + Math.random() * 20);
+            v.rotation.y = lane.dir > 0 ? 0 : Math.PI;
+        }
+
+        // Store lane info on the vehicle object
+        vehicles[vehicles.length - 1].laneInfo = lane;
     }
-}
+});
 
 // PEDESTRIANS
 const pedestrians = [];
@@ -1200,10 +1298,35 @@ function createPedestrian() {
     return group;
 }
 
-for (let i = 0; i < 30; i++) {
-    const p = createPedestrian();
-    p.position.set((Math.random()-0.5)*100, 0, (Math.random()-0.5)*80 + 20);
-}
+//  SIDEWALK ZONES  pedestrians only walk on sidewalks 
+// Sidewalks are at z=+/-10 along EW road, x=+/-10 along NS road
+const sidewalkZones = [
+    // Along main E-W road  north sidewalk (z10 to 13)
+    { xMin:-80, xMax:80, zMin:11, zMax:13, axis:'x' },
+    // Along main E-W road  south sidewalk (z-10 to -13)
+    { xMin:-80, xMax:80, zMin:-13, zMax:-11, axis:'x' },
+    // Along main N-S road  east sidewalk (x10 to 13)
+    { xMin:11, xMax:13, zMin:-80, zMax:80, axis:'z' },
+    // Along main N-S road  west sidewalk (x-13 to -10)
+    { xMin:-13, xMax:-11, zMin:-80, zMax:80, axis:'z' },
+    // Park zone sidewalk paths (z=62-68, park area)
+    { xMin:-20, xMax:20, zMin:62, zMax:65, axis:'x' },
+    { xMin:-20, xMax:20, zMin:95, zMax:98, axis:'x' },
+];
+
+const pedColors = [0x3366cc, 0xcc3333, 0x33cc33, 0xcc9933, 0x9933cc, 0xff6633, 0x33cccc];
+
+sidewalkZones.forEach((zone, zi) => {
+    const count = (zone.axis === 'x') ? 8 : 6;
+    for (let i = 0; i < count; i++) {
+        const p = createPedestrian();
+        const px = zone.xMin + Math.random() * (zone.xMax - zone.xMin);
+        const pz = zone.zMin + Math.random() * (zone.zMax - zone.zMin);
+        p.position.set(px, 0, pz);
+        // Store zone bounds for animation
+        pedestrians[pedestrians.length - 1].zone = zone;
+    }
+});
 
 // CLOUDS
 const clouds = [];
@@ -1275,25 +1398,32 @@ for (let i = -80; i <= 80; i += 20) {
     createStreetLight(i, -14);
 }
 
-// PARK BENCHES
-for (let i = 0; i < 10; i++) {
+//  PARK BENCHES  placed in a ring around the fountain (0,50) 
+const benchAngles = [0, 0.7, 1.4, 2.1, 2.8, 3.5, 4.2, 4.9, 5.6, 6.2];
+const benchRadius = 14; // ring around fountain
+benchAngles.forEach((angle, i) => {
+    const bx = Math.cos(angle) * benchRadius;
+    const bz = 50 + Math.sin(angle) * benchRadius;
     const benchGeo = new THREE.BoxGeometry(2, 0.1, 0.6);
     const benchMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
     const bench = new THREE.Mesh(benchGeo, benchMat);
-    bench.position.set((Math.random()-0.5)*50, 0.3, 65 + Math.random()*30);
-    bench.rotation.y = Math.random() * Math.PI;
+    bench.position.set(bx, 0.3, bz);
+    bench.rotation.y = angle + Math.PI/2; // face fountain
     bench.castShadow = true;
     scene.add(bench);
-
     const legGeo = new THREE.BoxGeometry(0.1, 0.4, 0.5);
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-    const leg1 = new THREE.Mesh(legGeo, legMat);
-    leg1.position.set(-0.8, 0.1, 0);
-    bench.add(leg1);
-    const leg2 = new THREE.Mesh(legGeo, legMat);
-    leg2.position.set(0.8, 0.1, 0);
-    bench.add(leg2);
-}
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+    [-0.8, 0.8].forEach(lx => {
+        const leg = new THREE.Mesh(legGeo, legMat);
+        leg.position.set(lx, 0.1, 0);
+        bench.add(leg);
+    });
+    // Back rest
+    const backGeo = new THREE.BoxGeometry(2, 0.5, 0.08);
+    const back = new THREE.Mesh(backGeo, benchMat);
+    back.position.set(0, 0.3, -0.26);
+    bench.add(back);
+});
 
 // FOUNTAIN
 const fountainGroup = new THREE.Group();
@@ -2650,25 +2780,60 @@ function animate() {
         boat.mesh.rotation.z = Math.sin(elapsed * 0.3) * 0.05;
     });
 
-    // Traffic
+    // Traffic  vehicles locked to their road lanes
     if (state.trafficEnabled) {
         vehicles.forEach(vehicle => {
-            vehicle.mesh.position.x += vehicle.speed * vehicle.direction;
-            if (vehicle.mesh.position.x > 130) vehicle.mesh.position.x = -130;
-            if (vehicle.mesh.position.x < -130) vehicle.mesh.position.x = 130;
+            const lane = vehicle.laneInfo;
+            if (!lane) return;
+            if (lane.axis === 'EW') {
+                // Move along X axis, lock Z to lane
+                vehicle.mesh.position.x += vehicle.speed * lane.dir;
+                vehicle.mesh.position.z = lane.z;       // LOCK to road lane
+                vehicle.mesh.position.y = 0;
+                if (vehicle.mesh.position.x > 140) vehicle.mesh.position.x = -140;
+                if (vehicle.mesh.position.x < -140) vehicle.mesh.position.x = 140;
+            } else {
+                // Move along Z axis, lock X to lane
+                vehicle.mesh.position.z += vehicle.speed * lane.dir;
+                vehicle.mesh.position.x = lane.x;       // LOCK to road lane
+                vehicle.mesh.position.y = 0;
+                if (vehicle.mesh.position.z > 110) vehicle.mesh.position.z = -100;
+                if (vehicle.mesh.position.z < -100) vehicle.mesh.position.z = 110;
+            }
         });
     }
 
-    // Pedestrians
+    // Pedestrians  clamped to sidewalk zone boundaries
     if (state.pedestriansEnabled) {
         pedestrians.forEach(ped => {
-            ped.mesh.position.x += ped.direction.x * ped.speed;
-            ped.mesh.position.z += ped.direction.z * ped.speed;
-            ped.mesh.position.y = Math.abs(Math.sin(elapsed * 5 + ped.walkOffset)) * 0.1;
-
-            if (Math.abs(ped.mesh.position.x) > 80 || Math.abs(ped.mesh.position.z) > 80) {
-                ped.direction.negate();
+            const zone = ped.zone;
+            if (!zone) {
+                // Fallback: simple move
+                ped.mesh.position.x += ped.direction.x * ped.speed;
+                ped.mesh.position.z += ped.direction.z * ped.speed;
+                if (Math.abs(ped.mesh.position.x) > 80) ped.direction.x *= -1;
+                if (Math.abs(ped.mesh.position.z) > 80) ped.direction.z *= -1;
+            } else if (zone.axis === 'x') {
+                // Walk along X axis, stay within Z zone
+                ped.mesh.position.x += ped.direction.x * ped.speed;
+                if (ped.mesh.position.x > zone.xMax) { ped.mesh.position.x = zone.xMax; ped.direction.x *= -1; }
+                if (ped.mesh.position.x < zone.xMin) { ped.mesh.position.x = zone.xMin; ped.direction.x *= -1; }
+                // Keep in Z band
+                ped.mesh.position.z = THREE.MathUtils.clamp(ped.mesh.position.z, zone.zMin, zone.zMax);
+            } else {
+                // Walk along Z axis, stay within X zone
+                ped.mesh.position.z += ped.direction.z * ped.speed;
+                if (ped.mesh.position.z > zone.zMax) { ped.mesh.position.z = zone.zMax; ped.direction.z *= -1; }
+                if (ped.mesh.position.z < zone.zMin) { ped.mesh.position.z = zone.zMin; ped.direction.z *= -1; }
+                // Keep in X band
+                ped.mesh.position.x = THREE.MathUtils.clamp(ped.mesh.position.x, zone.xMin, zone.xMax);
             }
+            ped.mesh.position.y = Math.abs(Math.sin(elapsed * 5 + ped.walkOffset)) * 0.1;
+            // Face walking direction
+            if (Math.abs(ped.direction.x) > Math.abs(ped.direction.z))
+                ped.mesh.rotation.y = ped.direction.x > 0 ? Math.PI/2 : -Math.PI/2;
+            else
+                ped.mesh.rotation.y = ped.direction.z > 0 ? 0 : Math.PI;
         });
     }
 

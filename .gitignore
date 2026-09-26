@@ -39,3 +39,7 @@ logs/
 # Database
 *.db
 *.sqlite3
+
+*.zip
+Movies-Analytics-in-Spark-and-Scala-master/
+*.backup.html
